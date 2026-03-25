@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vokabeltrainer</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <h1 onclick="goHome();" style="cursor:pointer;">Vokabeltrainer</h1>
+      <div class="header-right">
+        <span id="logged-in-user" class="user-badge hidden"></span>
+        <button class="btn btn-ghost btn-small" id="logout-btn" onclick="logout();" style="display:none;">Abmelden</button>
+        <button class="btn btn-ghost theme-toggle" id="theme-toggle" title="Dark Mode umschalten">
+          <span class="theme-icon" id="theme-icon">&#9790;</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- ==================== LOGIN VIEW ==================== -->
+    <div id="login-view" class="view">
+      <div class="hero">
+        <h2>Willkommen beim Vokabeltrainer</h2>
+        <p>Melde dich an oder erstelle einen Account.</p>
+      </div>
+      <div class="auth-card">
+        <div class="tabs">
+          <button class="tab active" onclick="switchAuthTab('login')">Anmelden</button>
+          <button class="tab" onclick="switchAuthTab('register')">Registrieren</button>
+        </div>
+
+        <div id="login-form">
+          <div class="form-group">
+            <label>Benutzername</label>
+            <input type="text" id="login-username" placeholder="Benutzername">
+          </div>
+          <div class="form-group">
+            <label>Passwort</label>
+            <input type="password" id="login-password" placeholder="Passwort">
+          </div>
+          <button class="btn btn-primary btn-large" style="width:100%;" onclick="login();">Anmelden</button>
+        </div>
+
+        <div id="register-form" class="hidden">
+          <div class="form-group">
+            <label>Vorname</label>
+            <input type="text" id="reg-vorname" placeholder="Vorname">
+          </div>
+          <div class="form-group">
+            <label>Nachname</label>
+            <input type="text" id="reg-nachname" placeholder="Nachname">
+          </div>
+          <div class="form-group">
+            <label>Benutzername</label>
+            <input type="text" id="reg-username" placeholder="Benutzername">
+          </div>
+          <div class="form-group">
+            <label>Passwort</label>
+            <input type="password" id="reg-password" placeholder="Passwort (Standard: 0000)" value="0000">
+          </div>
+          <div class="form-group">
+            <label>Rolle</label>
+            <div class="role-select">
+              <button class="role-btn active" data-role="schueler" onclick="selectRole('schueler')">Schüler</button>
+              <button class="role-btn" data-role="lehrer" onclick="selectRole('lehrer')">Lehrer</button>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-large" style="width:100%;" onclick="register();">Registrieren</button>
+        </div>
+
+        <div id="auth-error" class="error-msg"></div>
+      </div>
+    </div>
+
+    <!-- ==================== HOME VIEW ==================== -->
+    <div id="home-view" class="view hidden">
+      <div class="hero">
+        <h2>Vokabeln trainieren</h2>
+        <p>Lade deine Vokabeln hoch und lerne sie mit Karteikarten, Probe-Tests oder richtigen Prüfungen.</p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Vokabeln gesamt</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-practiced">0</div><div class="stat-label">Geübt</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-known">0</div><div class="stat-label">Gewusst</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-percentage">0%</div><div class="stat-label">Erfolgsquote</div></div>
+      </div>
+
+      <div class="action-grid">
+        <button class="btn btn-primary btn-large" id="start-btn" disabled onclick="showView('select-view'); renderLessons();">Karteikarten üben</button>
+        <button class="btn btn-secondary btn-large" id="probe-btn" disabled onclick="showProbeSelect();">Probe-Test</button>
+        <button class="btn btn-accent btn-large" id="teacher-dash-btn" onclick="showView('teacher-dashboard-view'); loadTeacherDashboard();">Lehrer-Dashboard</button>
+        <button class="btn btn-outline btn-large" id="student-dash-btn" onclick="showView('student-dashboard-view'); loadStudentDashboard();">Meine Tests</button>
+      </div>
+
+      <div class="center">
+        <button class="btn btn-secondary" id="show-stats-btn">Statistiken anzeigen</button>
+      </div>
+
+      <div id="stats-modal" class="modal hidden">
+        <div class="modal-overlay" id="stats-modal-overlay"></div>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Lektionsstatistik</h2>
+            <button class="btn btn-ghost modal-close" id="close-stats-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div id="bar-chart" class="bar-chart"></div>
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-color known"></span> Gewusst</span>
+              <span class="legend-item"><span class="legend-color unknown"></span> Nicht gewusst</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="upload-section">
+        <h3>Vokabeln hochladen</h3>
+        <p>CSV-Datei mit 4 Spalten: Wort, Formen, Deutsche Übersetzung, Lektionsnummer</p>
+        <input type="file" id="csv-input" accept=".csv" />
+        <div id="upload-status"></div>
+      </div>
+
+      <div class="upload-section" style="margin-top: 1rem;">
+        <h3>Voreingestellte Vokabeln</h3>
+        <p>Wähle eine Sammlung aus, um sie direkt zu laden:</p>
+        <div id="preset-container" class="preset-grid">
+          <p class="text-muted">Lade verfügbare Sammlungen...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== LESSON SELECT (Flashcards) ==================== -->
+    <div id="select-view" class="view hidden">
+      <button class="btn btn-ghost" onclick="showView('home-view'); updateStats();">Zurück zur Übersicht</button>
+      <div class="lesson-selector">
+        <h2>Lektionen auswählen</h2>
+        <p>Wähle die Lektionen aus, die du üben möchtest:</p>
+        <div class="lesson-controls">
+          <button class="btn btn-secondary" id="select-all-btn">Alle auswählen</button>
+          <button class="btn btn-secondary" id="deselect-all-btn">Alle abwählen</button>
+        </div>
+        <div id="lessons-grid" class="lessons-grid"></div>
+        <button class="btn btn-primary btn-large" id="start-practice-btn" disabled onclick="startPractice();">Üben starten</button>
+      </div>
+    </div>
+
+    <!-- ==================== PRACTICE VIEW (Flashcards) ==================== -->
+    <div id="practice-view" class="view hidden">
+      <button class="btn btn-ghost" onclick="showView('select-view'); renderLessons();">Zurück zur Auswahl</button>
+      <div class="practice-container" id="practice-container">
+        <div class="progress-info">
+          <span id="progress-text">Karte 1 von 10</span>
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        </div>
+        <div class="flashcard" id="flashcard">
+          <div class="flashcard-inner">
+            <div class="flashcard-front">
+              <div class="card-label">Latein</div>
+              <div class="card-word" id="latin-word">-</div>
+              <div class="card-hint">Klicken zum Aufdecken</div>
+            </div>
+            <div class="flashcard-back">
+              <div class="card-label">Deutsch</div>
+              <div class="card-word" id="german-word">-</div>
+              <div class="card-forms-back" id="german-forms"></div>
+            </div>
+          </div>
+        </div>
+        <div class="answer-buttons hidden" id="answer-buttons">
+          <button class="btn btn-danger" id="unknown-btn">Nicht gewusst</button>
+          <button class="btn btn-success" id="known-btn">Gewusst</button>
+        </div>
+      </div>
+      <div id="results-view" class="hidden">
+        <div class="results-card">
+          <h2>Übung abgeschlossen!</h2>
+          <div class="results-stats">
+            <div class="result-item"><span class="result-value" id="result-total">0</span><span class="result-label">Vokabeln</span></div>
+            <div class="result-item success"><span class="result-value" id="result-known">0</span><span class="result-label">Gewusst</span></div>
+            <div class="result-item danger"><span class="result-value" id="result-unknown">0</span><span class="result-label">Nicht gewusst</span></div>
+          </div>
+          <div class="result-percentage"><span id="result-percentage">0%</span> Erfolgsquote</div>
+          <div class="result-actions">
+            <button class="btn btn-warning hidden" id="practice-wrong-btn">Falsche wiederholen</button>
+            <button class="btn btn-secondary" id="practice-again-btn">Nochmal üben</button>
+            <button class="btn btn-primary" id="back-home-btn">Zur Übersicht</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== PROBE SELECT ==================== -->
+    <div id="probe-select-view" class="view hidden">
+      <button class="btn btn-ghost" onclick="showView('home-view'); updateStats();">Zurück</button>
+      <div class="lesson-selector">
+        <h2>Probe-Test: Lektionen wählen</h2>
+        <p>Wähle die Lektionen für den Probe-Test:</p>
+        <div class="lesson-controls">
+          <button class="btn btn-secondary" onclick="probeSelectAll();">Alle</button>
+          <button class="btn btn-secondary" onclick="probeDeselectAll();">Keine</button>
+        </div>
+        <div id="probe-lessons-grid" class="lessons-grid"></div>
+        <button class="btn btn-primary btn-large" id="start-probe-btn" disabled onclick="startProbeTest();">Test starten</button>
+      </div>
+    </div>
+
+    <!-- ==================== PROBE TEST ==================== -->
+    <div id="probe-test-view" class="view hidden">
+      <div class="test-container">
+        <div class="progress-info">
+          <span id="probe-progress-text">Frage 1 von 10</span>
+          <div class="progress-bar"><div class="progress-fill" id="probe-progress-fill"></div></div>
+        </div>
+        <div class="test-card">
+          <div class="card-label">Übersetze:</div>
+          <div class="card-word" id="probe-latin-word">-</div>
+          <div class="card-forms" id="probe-forms"></div>
+          <input type="text" class="test-input" id="probe-input" placeholder="Deutsche Übersetzung eingeben..." autocomplete="off">
+          <button class="btn btn-primary" onclick="submitProbeAnswer();">Antwort abgeben</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== PROBE RESULTS ==================== -->
+    <div id="probe-results-view" class="view hidden">
+      <div class="results-card" style="text-align:left;">
+        <h2 style="text-align:center;">Probe-Test Ergebnis</h2>
+        <div class="result-percentage" style="text-align:center;"><span id="probe-score">0/0</span></div>
+        <div class="table-wrap">
+          <table class="results-table">
+            <thead><tr><th>Latein</th><th>Deine Antwort</th><th>Richtige Antworten</th><th></th></tr></thead>
+            <tbody id="probe-results-body"></tbody>
+          </table>
+        </div>
+        <div class="result-actions" style="margin-top:1.5rem;">
+          <button class="btn btn-secondary" onclick="showView('home-view'); updateStats();">Zurück</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TEACHER DASHBOARD ==================== -->
+    <div id="teacher-dashboard-view" class="view hidden">
+      <button class="btn btn-ghost" onclick="goHome();">Zurück</button>
+      <h2>Lehrer-Dashboard</h2>
+
+      <div class="section-header">
+        <h3>Meine Klassen</h3>
+        <div class="inline-form">
+          <input type="text" id="new-class-name" placeholder="Klassenname">
+          <button class="btn btn-primary" onclick="createClass();">Anlegen</button>
+        </div>
+      </div>
+      <div id="classes-list" class="card-grid"></div>
+    </div>
+
+    <!-- ==================== CLASS VIEW ==================== -->
+    <div id="class-view" class="view hidden">
+      <button class="btn btn-ghost" onclick="showView('teacher-dashboard-view'); loadTeacherDashboard();">Zurück</button>
+      <div class="section-header">
+        <h2 id="class-title">Klasse</h2>
+        <button class="btn btn-danger btn-small" onclick="deleteClass();">Klasse löschen</button>
+      </div>
+
+      <div class="section-header">
+        <h3>Schüler</h3>
+        <div class="inline-form">
+          <input type="text" id="add-student-username" placeholder="Benutzername des Schülers">
+          <button class="btn btn-primary btn-small" onclick="addStudentToClass();">Hinzufügen</button>
+        </div>
+      </div>
+      <div id="class-students-list"></div>
+      <div id="add-student-error" class="error-msg"></div>
+
+      <div class="section-header" style="margin-top:2rem;">
+        <h3>Vokabeltests</h3>
+        <button class="btn btn-primary btn-small" onclick="showView('test-create-view'); renderTestLessons();">Neuen Test erstellen</button>
+      </div>
+      <div id="tests-list" class="card-grid"></div>
+    </div>
+
+    <!-- ==================== TEST CREATE ==================== -->
+    <div id="test-create-view" class="view hidden">
+      <button class="btn btn-ghost" onclick="showView('class-view'); loadClassData();">Zurück</button>
+      <div class="lesson-selector">
+        <h2>Neuen Test erstellen</h2>
+        <div class="form-group">
+          <label>Testname</label>
+          <input type="text" id="test-name" placeholder="z.B. Vokabeltest Lektion 1-3">
+        </div>
+        <div class="form-group">
+          <label>Anzahl Fragen</label>
+          <input type="number" id="test-question-count" value="10" min="1" max="50">
+        </div>
+        <p>Lektionen auswählen:</p>
+        <div class="lesson-controls">
+          <button class="btn btn-secondary" onclick="testSelectAll();">Alle</button>
+          <button class="btn btn-secondary" onclick="testDeselectAll();">Keine</button>
+        </div>
+        <div id="test-lessons-grid" class="lessons-grid"></div>
+        <button class="btn btn-primary btn-large" onclick="createTest();">Test erstellen</button>
+      </div>
+    </div>
+
+    <!-- ==================== TEST DETAIL (Teacher) ==================== -->
+    <div id="test-detail-view" class="view hidden">
+      <button class="btn btn-ghost" onclick="showView('class-view'); loadClassData();">Zurück</button>
+      <div class="section-header">
+        <h2 id="test-detail-title">Test</h2>
+        <button class="btn btn-danger btn-small" onclick="deleteTest();">Test löschen</button>
+      </div>
+      <p>Test-ID zum Teilen: <strong id="test-detail-id" class="test-id-display"></strong></p>
+
+      <h3>Ergebnisse</h3>
+      <div class="table-wrap">
+        <table class="results-table">
+          <thead><tr><th>Schüler</th><th>Ergebnis</th><th>Datum</th><th></th></tr></thead>
+          <tbody id="test-results-body"></tbody>
+        </table>
+      </div>
+
+      <h3 style="margin-top:2rem;">Einsprüche</h3>
+      <div class="table-wrap">
+        <table class="results-table">
+          <thead><tr><th>Schüler</th><th>Latein</th><th>Antwort</th><th>Richtig</th><th>Aktion</th></tr></thead>
+          <tbody id="appeals-body"></tbody>
+        </table>
+      </div>
+      <p id="no-appeals" class="text-muted hidden">Keine offenen Einsprüche.</p>
+    </div>
+
+    <!-- ==================== STUDENT ANSWERS (Teacher view) ==================== -->
+    <div id="student-answers-view" class="view hidden">
+      <button class="btn btn-ghost" onclick="backToTestDetail();">Zurück</button>
+      <h2>Antworten: <span id="student-answers-name"></span></h2>
+      <p>Ergebnis: <strong id="student-answers-score"></strong></p>
+      <div class="table-wrap">
+        <table class="results-table">
+          <thead><tr><th>Latein</th><th>Antwort</th><th>Richtig</th><th></th></tr></thead>
+          <tbody id="student-answers-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ==================== STUDENT DASHBOARD ==================== -->
+    <div id="student-dashboard-view" class="view hidden">
+      <button class="btn btn-ghost" onclick="goHome();">Zurück</button>
+      <h2>Meine Tests</h2>
+      <div class="form-group" style="max-width:400px;">
+        <label>Test-ID eingeben</label>
+        <div class="inline-form">
+          <input type="text" id="student-test-id" placeholder="Test-ID">
+          <button class="btn btn-primary" onclick="studentJoinTest();">Test starten</button>
+        </div>
+      </div>
+      <div id="student-join-error" class="error-msg"></div>
+      <h3 style="margin-top:2rem;">Bisherige Ergebnisse</h3>
+      <div id="student-results-list"></div>
+    </div>
+
+    <!-- ==================== STUDENT TEST ==================== -->
+    <div id="student-test-view" class="view hidden">
+      <div class="test-container">
+        <div class="progress-info">
+          <span id="student-progress-text">Frage 1 von 10</span>
+          <div class="progress-bar"><div class="progress-fill" id="student-progress-fill"></div></div>
+        </div>
+        <div class="test-card">
+          <div class="card-label">Übersetze:</div>
+          <div class="card-word" id="student-latin-word">-</div>
+          <div class="card-forms" id="student-forms"></div>
+          <input type="text" class="test-input" id="student-input" placeholder="Deutsche Übersetzung eingeben..." autocomplete="off">
+          <button class="btn btn-primary" onclick="submitStudentAnswer();">Antwort abgeben</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== STUDENT TEST RESULTS ==================== -->
+    <div id="student-results-view" class="view hidden">
+      <div class="results-card" style="text-align:left;">
+        <h2 style="text-align:center;">Testergebnis</h2>
+        <div class="result-percentage" style="text-align:center;"><span id="student-score">0/0</span></div>
+        <div class="table-wrap">
+          <table class="results-table">
+            <thead><tr><th>Latein</th><th>Deine Antwort</th><th>Richtige Antworten</th><th></th><th>Einspruch</th></tr></thead>
+            <tbody id="student-results-body"></tbody>
+          </table>
+        </div>
+        <div class="result-actions" style="margin-top:1.5rem;">
+          <button class="btn btn-primary" onclick="showView('student-dashboard-view'); loadStudentDashboard();">Zurück</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
