@@ -136,10 +136,14 @@ function switchAuthTab(tab) {
   showError('auth-error', '');
 }
 
+const TEACHER_REGISTRATION_CODE = 'fabian2026';
+
 function selectRole(role) {
   selectedRole = role;
   document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
   document.querySelector(`.role-btn[data-role="${role}"]`).classList.add('active');
+  const codeGroup = document.getElementById('teacher-code-group');
+  if (codeGroup) codeGroup.classList.toggle('hidden', role !== 'lehrer');
 }
 
 async function login() {
@@ -168,6 +172,11 @@ async function register() {
   const password = document.getElementById('reg-password').value.trim() || '0000';
 
   if (!vorname || !nachname || !username) return showError('auth-error', 'Bitte alle Felder ausfüllen.');
+
+  if (selectedRole === 'lehrer') {
+    const code = document.getElementById('reg-teacher-code').value.trim();
+    if (code !== TEACHER_REGISTRATION_CODE) return showError('auth-error', 'Ungültiger Lehrer-Code.');
+  }
 
   const { data, error } = await db.from('users').insert({
     vorname, nachname, benutzername: username, passwort: password, rolle: selectedRole
@@ -302,7 +311,7 @@ function setupEventListeners() {
   document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
   document.getElementById('student-test-id').addEventListener('keydown', e => { if (e.key === 'Enter') studentJoinTest(); });
   document.getElementById('new-class-name').addEventListener('keydown', e => { if (e.key === 'Enter') createClass(); });
-  document.getElementById('add-student-username').addEventListener('keydown', e => { if (e.key === 'Enter') addStudentToClass(); });
+  setupStudentSearch();
 }
 
 // ============================================================
@@ -442,7 +451,8 @@ function startPractice() {
 function showCard() {
   if (currentCardIndex >= currentPracticeCards.length) { showFlashcardResults(); return; }
   const card = currentPracticeCards[currentCardIndex];
-  document.getElementById('flashcard').classList.remove('flipped');
+  const fc = document.getElementById('flashcard');
+  fc.classList.remove('flipped');
   document.getElementById('answer-buttons').classList.add('hidden');
   document.getElementById('latin-word').textContent = card.latin_word;
   document.getElementById('german-word').textContent = card.german_translation;
@@ -465,7 +475,11 @@ function answerCard(known) {
   savePracticeResults();
   if (known) sessionResults.known++; else { sessionResults.unknown++; sessionResults.wrongCards.push(card); }
   currentCardIndex++;
-  showCard();
+  // Karte erst zurückdrehen, dann nach der Animation neuen Inhalt zeigen
+  const fc = document.getElementById('flashcard');
+  fc.classList.remove('flipped');
+  document.getElementById('answer-buttons').classList.add('hidden');
+  setTimeout(() => showCard(), 450);
 }
 
 function showFlashcardResults() {
@@ -686,22 +700,64 @@ async function loadClassStudents() {
     </div>`).join('');
 }
 
-async function addStudentToClass() {
-  const username = document.getElementById('add-student-username').value.trim();
-  if (!username) return;
+function setupStudentSearch() {
+  const input = document.getElementById('student-search-input');
+  const dropdown = document.getElementById('student-search-dropdown');
+  if (!input || !dropdown) return;
+  input.addEventListener('focus', () => renderStudentSearch(input.value));
+  input.addEventListener('input', () => renderStudentSearch(input.value));
+  document.addEventListener('click', (e) => {
+    if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.classList.add('hidden');
+    }
+  });
+}
+
+async function renderStudentSearch(query) {
+  const dropdown = document.getElementById('student-search-dropdown');
+  if (!currentClassId) { dropdown.classList.add('hidden'); return; }
+
+  // Alle Schüler laden
+  const { data: students } = await db.from('users').select('id, vorname, nachname, benutzername').eq('rolle', 'schueler');
+  if (!students) { dropdown.classList.add('hidden'); return; }
+
+  // Bereits in der Klasse: ausschließen
+  const { data: members } = await db.from('class_members').select('student_id').eq('class_id', currentClassId);
+  const inClass = new Set((members || []).map(m => m.student_id));
+
+  const q = (query || '').toLowerCase().trim();
+  const filtered = students
+    .filter(s => !inClass.has(s.id))
+    .filter(s => {
+      if (!q) return true;
+      return s.vorname.toLowerCase().includes(q)
+        || s.nachname.toLowerCase().includes(q)
+        || s.benutzername.toLowerCase().includes(q);
+    })
+    .slice(0, 50);
+
+  if (filtered.length === 0) {
+    dropdown.innerHTML = '<div class="dropdown-empty">Keine passenden Schüler gefunden.</div>';
+  } else {
+    dropdown.innerHTML = filtered.map(s =>
+      `<div class="dropdown-item" onclick="addStudentById('${s.id}')">
+         <strong>${esc(s.vorname)} ${esc(s.nachname)}</strong>
+         <span class="text-muted"> · ${esc(s.benutzername)}</span>
+       </div>`
+    ).join('');
+  }
+  dropdown.classList.remove('hidden');
+}
+
+async function addStudentById(studentId) {
   showError('add-student-error', '');
-
-  const { data: user, error: userErr } = await db.from('users')
-    .select('*').eq('benutzername', username).eq('rolle', 'schueler').single();
-  if (userErr || !user) return showError('add-student-error', 'Schüler "' + username + '" nicht gefunden.');
-
-  const { error: insertErr } = await db.from('class_members').insert({ class_id: currentClassId, student_id: user.id });
+  const { error: insertErr } = await db.from('class_members').insert({ class_id: currentClassId, student_id: studentId });
   if (insertErr) {
     if (insertErr.code === '23505') return showError('add-student-error', 'Schüler bereits in der Klasse.');
     return showError('add-student-error', 'Fehler beim Hinzufügen.');
   }
-
-  document.getElementById('add-student-username').value = '';
+  document.getElementById('student-search-input').value = '';
+  document.getElementById('student-search-dropdown').classList.add('hidden');
   loadClassStudents();
 }
 
