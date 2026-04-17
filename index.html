@@ -62,7 +62,7 @@
           </div>
           <div class="form-group">
             <label>Passwort</label>
-            <input type="password" id="reg-password" placeholder="Passwort (Standard: 0000)" value="0000">
+            <input type="password" id="reg-password" placeholder="Passwort (Standard: 0000)">
           </div>
           <div class="form-group">
             <label>Rolle</label>
@@ -70,6 +70,10 @@
               <button class="role-btn active" data-role="schueler" onclick="selectRole('schueler')">Schüler</button>
               <button class="role-btn" data-role="lehrer" onclick="selectRole('lehrer')">Lehrer</button>
             </div>
+          </div>
+          <div class="form-group hidden" id="teacher-code-group">
+            <label>Lehrer-Code</label>
+            <input type="password" id="reg-teacher-code" placeholder="Lehrer-Registrierungscode">
           </div>
           <button class="btn btn-primary btn-large" style="width:100%;" onclick="register();">Registrieren</button>
         </div>
@@ -271,10 +275,10 @@
 
       <div class="section-header">
         <h3>Schüler</h3>
-        <div class="inline-form">
-          <input type="text" id="add-student-username" placeholder="Benutzername des Schülers">
-          <button class="btn btn-primary btn-small" onclick="addStudentToClass();">Hinzufügen</button>
-        </div>
+      </div>
+      <div class="student-search-wrap">
+        <input type="text" id="student-search-input" placeholder="Schüler suchen (Name, Nachname oder Benutzername)..." autocomplete="off">
+        <div id="student-search-dropdown" class="student-dropdown hidden"></div>
       </div>
       <div id="class-students-list"></div>
       <div id="add-student-error" class="error-msg"></div>
