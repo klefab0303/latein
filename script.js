@@ -537,28 +537,75 @@ function showProbeCard() {
   if (probeIndex >= probeCards.length) { showProbeResults(); return; }
   const card = probeCards[probeIndex];
   document.getElementById('probe-latin-word').textContent = card.latin_word;
-  document.getElementById('probe-forms').textContent = card.forms || '';
+  document.getElementById('probe-forms').textContent = '';
+  const formsInput = document.getElementById('probe-forms-input');
+  if (card.forms && card.forms !== '-') {
+    formsInput.style.display = '';
+    formsInput.value = '';
+  } else {
+    formsInput.style.display = 'none';
+  }
   document.getElementById('probe-input').value = '';
-  document.getElementById('probe-input').focus();
+  document.getElementById('probe-forms-input').focus();
   document.getElementById('probe-progress-text').textContent = `Frage ${probeIndex + 1} von ${probeCards.length}`;
   document.getElementById('probe-progress-fill').style.width = ((probeIndex + 1) / probeCards.length * 100) + '%';
 }
 
-function normalizeAnswer(str) {
-  return str.toLowerCase().trim().replace(/[.,;:!?'"()\-]/g, '').replace(/\s+/g, ' ');
+// Articles and words to strip from translations
+const STRIP_WORDS = ['der', 'die', 'das', 'ein', 'eine', 'einer', 'eines', 'einem', 'einen'];
+
+function normalizeTranslation(str) {
+  // Remove all special chars except letters (incl. äöüß) and spaces
+  return str.toLowerCase().replace(/[^a-zäöüß\s]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function extractValidAnswers(germanTranslation) {
+  // Split by comma to get individual answer options
+  const parts = germanTranslation.split(',');
+  const answers = [];
+  for (const part of parts) {
+    let normalized = normalizeTranslation(part);
+    // Remove articles/strip words from beginning
+    const words = normalized.split(' ').filter(w => !STRIP_WORDS.includes(w));
+    const cleaned = words.join(' ').trim();
+    if (cleaned.length > 0) answers.push(cleaned);
+  }
+  return answers;
 }
 
 function checkAnswer(input, germanTranslation) {
-  const translations = germanTranslation.split(',').map(t => normalizeAnswer(t));
-  return translations.some(t => t && normalizeAnswer(input) === t);
+  const validAnswers = extractValidAnswers(germanTranslation);
+  const normalizedInput = normalizeTranslation(input);
+  // Remove articles from input too
+  const inputWords = normalizedInput.split(' ').filter(w => !STRIP_WORDS.includes(w));
+  const cleanedInput = inputWords.join(' ');
+  // Check if input contains at least one valid answer
+  return validAnswers.some(answer => cleanedInput.includes(answer));
+}
+
+function normalizeForms(str) {
+  // Remove spaces, commas, and special chars; lowercase
+  return str.toLowerCase().replace(/[^a-zäöüß]/g, '');
+}
+
+function checkForms(input, correctForms) {
+  if (!correctForms || correctForms === '-') return true; // No forms required
+  return normalizeForms(input) === normalizeForms(correctForms);
 }
 
 function submitProbeAnswer() {
   const input = document.getElementById('probe-input').value;
+  const formsInput = document.getElementById('probe-forms-input').value;
   if (!input.trim()) return;
   const card = probeCards[probeIndex];
-  const correct = checkAnswer(input, card.german_translation);
-  probeAnswers.push({ latin: card.latin_word, answer: input, correctAnswers: card.german_translation, isCorrect: correct });
+  const translationCorrect = checkAnswer(input, card.german_translation);
+  const formsCorrect = (!card.forms || card.forms === '-') ? true : checkForms(formsInput, card.forms);
+  const correct = translationCorrect && formsCorrect;
+  probeAnswers.push({
+    latin: card.latin_word, answer: input, formsAnswer: formsInput,
+    correctAnswers: card.german_translation, correctForms: card.forms || '-',
+    isCorrect: correct, translationCorrect, formsCorrect
+  });
   probeIndex++;
   showProbeCard();
 }
@@ -568,7 +615,9 @@ function showProbeResults() {
   document.getElementById('probe-score').textContent = `${score} / ${probeAnswers.length}`;
   document.getElementById('probe-results-body').innerHTML = probeAnswers.map(a => `
     <tr class="${a.isCorrect ? 'row-correct' : 'row-wrong'}">
-      <td>${esc(a.latin)}</td><td>${esc(a.answer)}</td><td>${esc(a.correctAnswers)}</td>
+      <td>${esc(a.latin)}</td>
+      <td>${esc(a.formsAnswer || '')}${a.correctForms !== '-' ? ' <small>(richtig: ' + esc(a.correctForms) + ')</small>' : ''}</td>
+      <td>${esc(a.answer)}</td><td>${esc(a.correctAnswers)}</td>
       <td>${a.isCorrect ? '&#10003;' : '&#10007;'}</td>
     </tr>`).join('');
   showView('probe-results-view');
@@ -900,21 +949,32 @@ function showStudentCard() {
   if (studentIndex >= studentCards.length) { submitStudentTest(); return; }
   const card = studentCards[studentIndex];
   document.getElementById('student-latin-word').textContent = card.latin_word;
-  document.getElementById('student-forms').textContent = card.forms || '';
+  document.getElementById('student-forms').textContent = '';
+  const formsInput = document.getElementById('student-forms-input');
+  if (card.forms && card.forms !== '-') {
+    formsInput.style.display = '';
+    formsInput.value = '';
+  } else {
+    formsInput.style.display = 'none';
+  }
   document.getElementById('student-input').value = '';
-  document.getElementById('student-input').focus();
+  document.getElementById('student-forms-input').focus();
   document.getElementById('student-progress-text').textContent = `Frage ${studentIndex + 1} von ${studentCards.length}`;
   document.getElementById('student-progress-fill').style.width = ((studentIndex + 1) / studentCards.length * 100) + '%';
 }
 
 function submitStudentAnswer() {
   const input = document.getElementById('student-input').value;
+  const formsInput = document.getElementById('student-forms-input').value;
   if (!input.trim()) return;
   const card = studentCards[studentIndex];
-  const correct = checkAnswer(input, card.german_translation);
+  const translationCorrect = checkAnswer(input, card.german_translation);
+  const formsCorrect = (!card.forms || card.forms === '-') ? true : checkForms(formsInput, card.forms);
+  const correct = translationCorrect && formsCorrect;
   studentAnswers.push({
-    latin_word: card.latin_word, student_answer: input,
-    correct_answers: card.german_translation, is_correct: correct
+    latin_word: card.latin_word, student_answer: input, forms_answer: formsInput,
+    correct_answers: card.german_translation, correct_forms: card.forms || '-',
+    is_correct: correct
   });
   studentIndex++;
   showStudentCard();
@@ -943,7 +1003,9 @@ function showStudentResultsView(score, total) {
   document.getElementById('student-score').textContent = `${score} / ${total}`;
   document.getElementById('student-results-body').innerHTML = studentAnswers.map((a, i) => `
     <tr class="${a.is_correct ? 'row-correct' : 'row-wrong'}">
-      <td>${esc(a.latin_word)}</td><td>${esc(a.student_answer)}</td><td>${esc(a.correct_answers)}</td>
+      <td>${esc(a.latin_word)}</td>
+      <td>${esc(a.forms_answer || '')}${a.correct_forms !== '-' ? ' <small>(richtig: ' + esc(a.correct_forms) + ')</small>' : ''}</td>
+      <td>${esc(a.student_answer)}</td><td>${esc(a.correct_answers)}</td>
       <td>${a.is_correct ? '&#10003;' : '&#10007;'}</td>
       <td>${a.is_correct ? '' : '<button class="btn btn-warning btn-small" onclick="submitAppeal(' + i + ', this)">Einspruch</button>'}</td>
     </tr>`).join('');
