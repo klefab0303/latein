@@ -313,3 +313,12 @@ header h1 { font-size: 1.5rem; font-weight: 600; }
   .bar-group { min-width: 20px; }
   .results-table th, .results-table td { padding: 0.5rem; font-size: 0.8rem; }
 }
+
+/* Student search dropdown */
+.student-search-wrap { position: relative; max-width: 480px; margin-bottom: 0.75rem; }
+.student-search-wrap input { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--bg-input, #fff); color: inherit; }
+.student-dropdown { position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; max-height: 280px; overflow-y: auto; background: var(--bg-card, #fff); color: inherit; border: 1px solid var(--border, #ccc); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.12); z-index: 100; }
+.dropdown-item { padding: 0.55rem 0.75rem; cursor: pointer; border-bottom: 1px solid var(--border, #eee); }
+.dropdown-item:last-child { border-bottom: none; }
+.dropdown-item:hover { background: var(--bg-hover, #f3f4f6); }
+.dropdown-empty { padding: 0.75rem; text-align: center; color: var(--text-muted, #888); font-size: 0.9rem; }
