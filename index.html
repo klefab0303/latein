@@ -222,6 +222,7 @@
           <div class="card-label">Übersetze:</div>
           <div class="card-word" id="probe-latin-word">-</div>
           <div class="card-forms" id="probe-forms"></div>
+          <input type="text" class="test-input" id="probe-forms-input" placeholder="Formen eingeben..." autocomplete="off">
           <input type="text" class="test-input" id="probe-input" placeholder="Deutsche Übersetzung eingeben..." autocomplete="off">
           <button class="btn btn-primary" onclick="submitProbeAnswer();">Antwort abgeben</button>
         </div>
@@ -235,7 +236,7 @@
         <div class="result-percentage" style="text-align:center;"><span id="probe-score">0/0</span></div>
         <div class="table-wrap">
           <table class="results-table">
-            <thead><tr><th>Latein</th><th>Deine Antwort</th><th>Richtige Antworten</th><th></th></tr></thead>
+            <thead><tr><th>Latein</th><th>Formen</th><th>Deine Antwort</th><th>Richtige Antworten</th><th></th></tr></thead>
             <tbody id="probe-results-body"></tbody>
           </table>
         </div>
@@ -375,6 +376,7 @@
           <div class="card-label">Übersetze:</div>
           <div class="card-word" id="student-latin-word">-</div>
           <div class="card-forms" id="student-forms"></div>
+          <input type="text" class="test-input" id="student-forms-input" placeholder="Formen eingeben..." autocomplete="off">
           <input type="text" class="test-input" id="student-input" placeholder="Deutsche Übersetzung eingeben..." autocomplete="off">
           <button class="btn btn-primary" onclick="submitStudentAnswer();">Antwort abgeben</button>
         </div>
@@ -388,7 +390,7 @@
         <div class="result-percentage" style="text-align:center;"><span id="student-score">0/0</span></div>
         <div class="table-wrap">
           <table class="results-table">
-            <thead><tr><th>Latein</th><th>Deine Antwort</th><th>Richtige Antworten</th><th></th><th>Einspruch</th></tr></thead>
+            <thead><tr><th>Latein</th><th>Formen</th><th>Deine Antwort</th><th>Richtige Antworten</th><th></th><th>Einspruch</th></tr></thead>
             <tbody id="student-results-body"></tbody>
           </table>
         </div>
