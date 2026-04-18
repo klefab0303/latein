@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vokabeltrainer – Info</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="info">
+  <header>
+    <div class="header-content">
+      <h1 onclick="history.back()" style="cursor:pointer;">Vokabeltrainer</h1>
+      <div class="header-right">
+        <a href="javascript:history.back()" class="btn btn-ghost btn-small">Zurück</a>
+        <button class="btn btn-ghost theme-toggle" id="theme-toggle" title="Dark Mode umschalten">
+          <span class="theme-icon" id="theme-icon">&#9790;</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="hero">
+      <h2>Info & Hilfe</h2>
+      <p>Hier erfährst du, wie der Vokabeltrainer funktioniert und wie deine Antworten korrigiert werden.</p>
+    </div>
+
+    <section class="info-card">
+      <h3>So werden deine Antworten korrigiert</h3>
+      <p>Bei jedem Test prüfen wir <strong>zwei Felder</strong>: die <em>Formen</em> (Latein) und die <em>Übersetzung</em> (Deutsch). Beide müssen stimmen, damit die Vokabel als richtig zählt. Hat eine Vokabel keine Formen in der CSV-Datei, wird nur die Übersetzung geprüft.</p>
+
+      <h4>Übersetzung (Deutsch)</h4>
+      <ul>
+        <li>Groß-/Kleinschreibung spielt <strong>keine Rolle</strong>.</li>
+        <li>Artikel (<code>der, die, das, ein, eine, einer, eines, einem, einen</code>) werden <strong>ignoriert</strong> – sowohl in der Lösung als auch in deiner Antwort.</li>
+        <li>Sonderzeichen wie <code>( ) / &amp; % $ § " ! ?</code> werden ignoriert. Es zählen nur Buchstaben (auch ä, ö, ü, ß) und Leerzeichen.</li>
+        <li>In der CSV stehen oft mehrere Übersetzungen, getrennt durch <code>,</code> oder <code>;</code>. Es reicht, wenn deine Eingabe <strong>mindestens eine</strong> dieser Möglichkeiten enthält.</li>
+        <li>Beispiel: Lösung <code>tum = dann, da, darauf, damals</code> → akzeptiert werden „dann", „Da", „darauf!", „und damals", usw.</li>
+      </ul>
+
+      <h4>Formen (Latein)</h4>
+      <ul>
+        <li>Groß-/Kleinschreibung spielt <strong>keine Rolle</strong>.</li>
+        <li>Leerzeichen, Kommas und alle Sonderzeichen werden <strong>komplett entfernt</strong> – sowohl bei dir als auch in der Lösung.</li>
+        <li>Die übrig bleibenden Buchstabenketten müssen <strong>exakt übereinstimmen</strong>.</li>
+        <li>Beispiel: Lösung <code>amo, amare, amavi, amatum</code> → korrekt: „amoamareamaviamatum", „amo amare amavi amatum", „Amo, Amare, Amavi, Amatum".</li>
+      </ul>
+    </section>
+
+    <section class="info-card">
+      <h3>Einsprüche</h3>
+      <p>Wenn du der Meinung bist, dass deine Antwort doch richtig war, kannst du in der Ergebnisansicht eines Tests <strong>Einspruch</strong> einreichen. Der Lehrer sieht den Einspruch im Test-Detail und kann ihn entweder <strong>genehmigen</strong> (Vokabel zählt nachträglich als richtig, Punkt wird gutgeschrieben) oder <strong>ablehnen</strong>. Nach der Entscheidung verschwindet der Einspruch wieder aus der Liste.</p>
+    </section>
+
+    <section class="info-card">
+      <h3>Rollen</h3>
+      <ul>
+        <li><strong>Schüler</strong>: Üben mit Karteikarten, Probe-Tests schreiben und an echten Vokabeltests teilnehmen.</li>
+        <li><strong>Lehrer</strong>: Klassen anlegen, Schüler hinzufügen, Tests erstellen, Ergebnisse einsehen und Einsprüche bearbeiten. Für die Registrierung als Lehrer ist ein Code nötig.</li>
+      </ul>
+    </section>
+
+    <section class="info-card">
+      <h3>CSV-Format</h3>
+      <p>Vier Spalten pro Zeile, getrennt durch <code>,</code> oder <code>;</code>:</p>
+      <pre><code>Latein,Formen,Deutsche Übersetzung,Lektionsnummer
+amare,"amo, amare, amavi, amatum",lieben,1
+tum,-,"dann, da, darauf, damals",2</code></pre>
+      <p>Steht in der Formen-Spalte ein <code>-</code> oder ist sie leer, wird kein Formen-Eingabefeld angezeigt.</p>
+    </section>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
