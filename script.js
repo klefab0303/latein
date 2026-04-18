@@ -141,9 +141,12 @@ const TEACHER_REGISTRATION_CODE = 'fabian2026';
 function selectRole(role) {
   selectedRole = role;
   document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
-  document.querySelector(`.role-btn[data-role="${role}"]`).classList.add('active');
+  const activeBtn = document.querySelector(`.role-btn[data-role="${role}"]`);
+  if (activeBtn) activeBtn.classList.add('active');
   const codeGroup = document.getElementById('teacher-code-group');
+  const codeInput = document.getElementById('reg-teacher-code');
   if (codeGroup) codeGroup.classList.toggle('hidden', role !== 'lehrer');
+  if (codeInput && role !== 'lehrer') codeInput.value = '';
 }
 
 async function login() {
@@ -175,6 +178,7 @@ async function register() {
 
   if (selectedRole === 'lehrer') {
     const code = document.getElementById('reg-teacher-code').value.trim();
+    if (!code) return showError('auth-error', 'Bitte gib den Lehrer-Code ein.');
     if (code !== TEACHER_REGISTRATION_CODE) return showError('auth-error', 'Ungültiger Lehrer-Code.');
   }
 
@@ -715,11 +719,31 @@ function setupStudentSearch() {
 
 async function renderStudentSearch(query) {
   const dropdown = document.getElementById('student-search-dropdown');
+  if (!dropdown) return;
+  if (!db) {
+    dropdown.innerHTML = '<div class="dropdown-empty">Keine Datenbankverbindung.</div>';
+    dropdown.classList.remove('hidden');
+    return;
+  }
   if (!currentClassId) { dropdown.classList.add('hidden'); return; }
 
   // Alle Schüler laden
-  const { data: students } = await db.from('users').select('id, vorname, nachname, benutzername').eq('rolle', 'schueler');
-  if (!students) { dropdown.classList.add('hidden'); return; }
+  const { data: students, error: studErr } = await db
+    .from('users')
+    .select('id, vorname, nachname, benutzername')
+    .eq('rolle', 'schueler');
+
+  if (studErr) {
+    console.error('Schüler-Suche Fehler:', studErr);
+    dropdown.innerHTML = `<div class="dropdown-empty">Fehler beim Laden: ${esc(studErr.message || 'Unbekannt')}</div>`;
+    dropdown.classList.remove('hidden');
+    return;
+  }
+  if (!students || students.length === 0) {
+    dropdown.innerHTML = '<div class="dropdown-empty">Es sind keine Schüler registriert.</div>';
+    dropdown.classList.remove('hidden');
+    return;
+  }
 
   // Bereits in der Klasse: ausschließen
   const { data: members } = await db.from('class_members').select('student_id').eq('class_id', currentClassId);
@@ -730,9 +754,9 @@ async function renderStudentSearch(query) {
     .filter(s => !inClass.has(s.id))
     .filter(s => {
       if (!q) return true;
-      return s.vorname.toLowerCase().includes(q)
-        || s.nachname.toLowerCase().includes(q)
-        || s.benutzername.toLowerCase().includes(q);
+      return (s.vorname || '').toLowerCase().includes(q)
+        || (s.nachname || '').toLowerCase().includes(q)
+        || (s.benutzername || '').toLowerCase().includes(q);
     })
     .slice(0, 50);
 
