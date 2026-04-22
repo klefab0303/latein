@@ -54,31 +54,72 @@ let studentAnswers = [];
 let studentResultId = null;
 
 // ============================================================
-// INIT
+// INIT (page-aware)
 // ============================================================
+const PAGE = (document.body && document.body.dataset.page) || 'login';
+
 document.addEventListener('DOMContentLoaded', () => {
   loadTheme();
-  loadData();
+  setupThemeToggle();
 
-  // Check saved session
-  const savedUser = localStorage.getItem(USER_KEY);
-  if (savedUser) {
-    try {
-      currentUser = JSON.parse(savedUser);
-      showLoggedInState();
-      showView('home-view');
-      updateStats();
-      loadPresetVocabularies();
-    } catch (e) {
-      localStorage.removeItem(USER_KEY);
-      showView('login-view');
-    }
-  } else {
-    showView('login-view');
+  if (PAGE === 'info') {
+    return; // info-Seite: nur Theme nötig
   }
 
-  setupEventListeners();
+  loadData();
+
+  const savedUser = (() => {
+    try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null'); }
+    catch { localStorage.removeItem(USER_KEY); return null; }
+  })();
+
+  if (PAGE === 'login') {
+    if (savedUser) {
+      // Bereits eingeloggt → weiterleiten
+      window.location.href = savedUser.rolle === 'lehrer' ? 'lehrer.html' : 'schueler.html';
+      return;
+    }
+    showView('login-view');
+    setupLoginListeners();
+    return;
+  }
+
+  // Geschützte Seiten (schueler/lehrer/analyse)
+  if (!savedUser) {
+    window.location.href = 'index.html';
+    return;
+  }
+  currentUser = savedUser;
+
+  // Falsche Rolle → richtige Seite
+  if (PAGE === 'lehrer' && currentUser.rolle !== 'lehrer') {
+    window.location.href = 'schueler.html';
+    return;
+  }
+  if (PAGE === 'schueler' && currentUser.rolle === 'lehrer') {
+    window.location.href = 'lehrer.html';
+    return;
+  }
+
+  showLoggedInState();
+  if (PAGE !== 'analyse') showView('home-view');
+  if (PAGE === 'schueler') {
+    updateStats();
+    loadPresetVocabularies();
+    setupSchuelerListeners();
+  } else if (PAGE === 'lehrer') {
+    loadPresetVocabularies();
+    setupLehrerListeners();
+    loadTeacherDashboard();
+  } else if (PAGE === 'analyse') {
+    setupAnalyseListeners();
+  }
 });
+
+function setupThemeToggle() {
+  const t = document.getElementById('theme-toggle');
+  if (t) t.addEventListener('click', toggleTheme);
+}
 
 // ============================================================
 // NAVIGATION
@@ -92,7 +133,13 @@ function showView(id) {
 
 function goHome() {
   showView('home-view');
-  updateStats();
+  if (PAGE === 'schueler') updateStats();
+  if (PAGE === 'lehrer') loadTeacherDashboard();
+}
+
+function redirectToRoleHome() {
+  if (!currentUser) { window.location.href = 'index.html'; return; }
+  window.location.href = currentUser.rolle === 'lehrer' ? 'lehrer.html' : 'schueler.html';
 }
 
 // ============================================================
@@ -161,10 +208,7 @@ async function login() {
   currentUser = data;
   localStorage.setItem(USER_KEY, JSON.stringify(data));
   showError('auth-error', '');
-  showLoggedInState();
-  showView('home-view');
-  updateStats();
-  loadPresetVocabularies();
+  redirectToRoleHome();
 }
 
 async function register() {
@@ -194,30 +238,23 @@ async function register() {
   currentUser = data;
   localStorage.setItem(USER_KEY, JSON.stringify(data));
   showError('auth-error', '');
-  showLoggedInState();
-  showView('home-view');
-  updateStats();
-  loadPresetVocabularies();
+  redirectToRoleHome();
 }
 
 function logout() {
   currentUser = null;
   localStorage.removeItem(USER_KEY);
-  document.getElementById('logged-in-user').classList.add('hidden');
-  document.getElementById('logout-btn').style.display = 'none';
-  showView('login-view');
+  window.location.href = 'index.html';
 }
 
 function showLoggedInState() {
   const badge = document.getElementById('logged-in-user');
-  badge.textContent = currentUser.vorname + ' ' + currentUser.nachname;
-  badge.classList.remove('hidden');
-  document.getElementById('logout-btn').style.display = '';
-
-  // Show/hide role-specific buttons
-  const isTeacher = currentUser.rolle === 'lehrer';
-  document.getElementById('teacher-dash-btn').style.display = isTeacher ? '' : 'none';
-  document.getElementById('student-dash-btn').style.display = '';
+  if (badge && currentUser) {
+    badge.textContent = currentUser.vorname + ' ' + currentUser.nachname;
+    badge.classList.remove('hidden');
+  }
+  const lo = document.getElementById('logout-btn');
+  if (lo) lo.style.display = '';
 }
 
 // ============================================================
@@ -241,15 +278,14 @@ function updateStats() {
   const practiced = practiceResults.length;
   const known = practiceResults.filter(r => r.known).length;
   const pct = practiced > 0 ? Math.round((known / practiced) * 100) : 0;
-
-  document.getElementById('stat-total').textContent = total;
-  document.getElementById('stat-practiced').textContent = practiced;
-  document.getElementById('stat-known').textContent = known;
-  document.getElementById('stat-percentage').textContent = pct + '%';
-
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set('stat-total', total);
+  set('stat-practiced', practiced);
+  set('stat-known', known);
+  set('stat-percentage', pct + '%');
   const hasVocabs = total > 0;
-  document.getElementById('start-btn').disabled = !hasVocabs;
-  document.getElementById('probe-btn').disabled = !hasVocabs;
+  const sb = document.getElementById('start-btn'); if (sb) sb.disabled = !hasVocabs;
+  const pb = document.getElementById('probe-btn'); if (pb) pb.disabled = !hasVocabs;
 }
 
 function showStatsModal() {
@@ -292,29 +328,43 @@ function renderBarChart() {
 // ============================================================
 // EVENT LISTENERS
 // ============================================================
-function setupEventListeners() {
-  document.getElementById('csv-input').addEventListener('change', handleCSVUpload);
-  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
-  document.getElementById('show-stats-btn').addEventListener('click', showStatsModal);
-  document.getElementById('close-stats-btn').addEventListener('click', hideStatsModal);
-  document.getElementById('stats-modal-overlay').addEventListener('click', hideStatsModal);
-  document.getElementById('select-all-btn').addEventListener('click', selectAllLessons);
-  document.getElementById('deselect-all-btn').addEventListener('click', deselectAllLessons);
-  document.getElementById('flashcard').addEventListener('click', flipCard);
-  document.getElementById('known-btn').addEventListener('click', () => answerCard(true));
-  document.getElementById('unknown-btn').addEventListener('click', () => answerCard(false));
-  document.getElementById('practice-again-btn').addEventListener('click', () => {
+function on(id, evt, fn) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener(evt, fn);
+}
+
+function setupLoginListeners() {
+  on('login-password', 'keydown', e => { if (e.key === 'Enter') login(); });
+}
+
+function setupCommonAppListeners() {
+  // CSV-Upload wurde entfernt – Vokabeln nur noch über Bücher wählbar.
+}
+
+function setupSchuelerListeners() {
+  setupCommonAppListeners();
+  on('show-stats-btn', 'click', showStatsModal);
+  on('close-stats-btn', 'click', hideStatsModal);
+  on('stats-modal-overlay', 'click', hideStatsModal);
+  on('select-all-btn', 'click', selectAllLessons);
+  on('deselect-all-btn', 'click', deselectAllLessons);
+  on('flashcard', 'click', flipCard);
+  on('known-btn', 'click', () => answerCard(true));
+  on('unknown-btn', 'click', () => answerCard(false));
+  on('practice-again-btn', 'click', () => {
     if (selectedLessons.length === 0) { showView('select-view'); renderLessons(); }
     else startPractice();
   });
-  document.getElementById('practice-wrong-btn').addEventListener('click', practiceWrongCards);
-  document.getElementById('back-home-btn').addEventListener('click', goHome);
+  on('practice-wrong-btn', 'click', practiceWrongCards);
+  on('back-home-btn', 'click', goHome);
+  on('probe-input', 'keydown', e => { if (e.key === 'Enter') submitProbeAnswer(); });
+  on('student-input', 'keydown', e => { if (e.key === 'Enter') submitStudentAnswer(); });
+  on('student-test-id', 'keydown', e => { if (e.key === 'Enter') studentJoinTest(); });
+}
 
-  document.getElementById('probe-input').addEventListener('keydown', e => { if (e.key === 'Enter') submitProbeAnswer(); });
-  document.getElementById('student-input').addEventListener('keydown', e => { if (e.key === 'Enter') submitStudentAnswer(); });
-  document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
-  document.getElementById('student-test-id').addEventListener('keydown', e => { if (e.key === 'Enter') studentJoinTest(); });
-  document.getElementById('new-class-name').addEventListener('keydown', e => { if (e.key === 'Enter') createClass(); });
+function setupLehrerListeners() {
+  setupCommonAppListeners();
+  on('new-class-name', 'keydown', e => { if (e.key === 'Enter') createClass(); });
   setupStudentSearch();
 }
 
@@ -360,25 +410,9 @@ function parseCSVLine(line) {
   return result.map(s => s.replace(/^"|"$/g, '').trim());
 }
 
-function handleCSVUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const newVocabs = processCSVText(e.target.result);
-      if (newVocabs.length > 0) {
-        vocabularies = newVocabs; practiceResults = []; selectedLessons = [];
-        saveVocabularies(); savePracticeResults(); updateStats();
-        showUploadStatus(newVocabs.length + ' Vokabeln erfolgreich hochgeladen!', 'success');
-      } else showUploadStatus('Keine gültigen Vokabeln gefunden.', 'error');
-    } catch (err) { showUploadStatus('Fehler beim Lesen der Datei.', 'error'); }
-  };
-  reader.readAsText(file);
-}
-
 function showUploadStatus(message, type) {
   const el = document.getElementById('upload-status');
+  if (!el) return;
   el.textContent = message; el.className = type;
 }
 
@@ -389,20 +423,41 @@ function generateId() { return Math.random().toString(36).substr(2, 9) + Date.no
 // ============================================================
 function loadPresetVocabularies() {
   const container = document.getElementById('preset-container');
+  if (!container) return;
   fetch('vocabs/manifest.json')
     .then(res => { if (!res.ok) throw new Error(); return res.json(); })
     .then(presets => {
-      if (presets.length === 0) { container.innerHTML = '<p class="text-muted">Keine Sammlungen verfügbar.</p>'; return; }
-      container.innerHTML = presets.map(p => `<button class="preset-btn" data-file="${p.file}">${p.name}</button>`).join('');
-      container.querySelectorAll('.preset-btn').forEach(btn => {
-        btn.addEventListener('click', () => loadPresetFile(btn.dataset.file, btn));
+      if (!presets || presets.length === 0) {
+        container.innerHTML = '<p class="text-muted">Keine Bücher verfügbar.</p>';
+        return;
+      }
+      container.innerHTML = presets.map((p, i) => {
+        const initials = (p.name || '?').split(/\s+/).map(s => s[0]).join('').slice(0, 3).toUpperCase();
+        const coverHtml = p.cover
+          ? `<img class="book-cover" src="vocabs/${esc(p.cover)}" alt="${esc(p.name)}" onerror="this.outerHTML='<div class=\\'book-cover-fallback\\'>${esc(initials)}</div>'">`
+          : `<div class="book-cover-fallback">${esc(initials)}</div>`;
+        return `
+          <button class="book-card" data-idx="${i}">
+            ${coverHtml}
+            <div class="book-info">
+              <div class="book-title">${esc(p.name)}</div>
+              ${p.description ? `<div class="book-desc">${esc(p.description)}</div>` : ''}
+            </div>
+          </button>`;
+      }).join('');
+      container.querySelectorAll('.book-card').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.dataset.idx, 10);
+          const preset = presets[idx];
+          loadPresetFile(preset.file, preset.name, btn);
+        });
       });
     })
-    .catch(() => { container.innerHTML = '<p class="text-muted">Keine voreingestellten Sammlungen gefunden.</p>'; });
+    .catch(() => { container.innerHTML = '<p class="text-muted">Keine Bücher gefunden.</p>'; });
 }
 
-function loadPresetFile(filename, btn) {
-  const orig = btn.textContent; btn.textContent = 'Laden...'; btn.disabled = true;
+function loadPresetFile(filename, name, btn) {
+  if (btn) btn.disabled = true;
   fetch('vocabs/' + filename)
     .then(res => { if (!res.ok) throw new Error(); return res.text(); })
     .then(text => {
@@ -410,11 +465,11 @@ function loadPresetFile(filename, btn) {
       if (nv.length > 0) {
         vocabularies = nv; practiceResults = []; selectedLessons = [];
         saveVocabularies(); savePracticeResults(); updateStats();
-        showUploadStatus(nv.length + " Vokabeln aus '" + orig + "' geladen!", 'success');
+        showUploadStatus(nv.length + " Vokabeln aus '" + (name || filename) + "' geladen!", 'success');
       } else showUploadStatus('Keine gültigen Vokabeln in dieser Datei.', 'error');
-      btn.textContent = orig; btn.disabled = false;
+      if (btn) btn.disabled = false;
     })
-    .catch(() => { showUploadStatus('Fehler beim Laden der Datei.', 'error'); btn.textContent = orig; btn.disabled = false; });
+    .catch(() => { showUploadStatus('Fehler beim Laden der Datei.', 'error'); if (btn) btn.disabled = false; });
 }
 
 // ============================================================
@@ -1119,4 +1174,91 @@ function showError(elementId, msg) {
 function esc(str) {
   if (!str) return '';
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+// ============================================================
+// ANALYSE PAGE
+// ============================================================
+function goAnalyseHome() {
+  if (!currentUser) { window.location.href = 'index.html'; return; }
+  window.location.href = currentUser.rolle === 'lehrer' ? 'lehrer.html' : 'schueler.html';
+}
+
+function setupAnalyseListeners() {
+  on('analyse-input', 'keydown', e => { if (e.key === 'Enter') runAnalyse(); });
+  // Alle Bücher im Hintergrund laden, damit Lemma-Matching funktioniert
+  loadAllBooksForAnalysis();
+}
+
+let ALL_VOCABS_FOR_ANALYSIS = [];
+async function loadAllBooksForAnalysis() {
+  try {
+    const res = await fetch('vocabs/manifest.json');
+    const presets = await res.json();
+    const all = [];
+    for (const p of presets) {
+      try {
+        const txt = await (await fetch('vocabs/' + p.file)).text();
+        const vs = processCSVText(txt).map(v => Object.assign({}, v, { book: p.name }));
+        all.push(...vs);
+      } catch {}
+    }
+    ALL_VOCABS_FOR_ANALYSIS = all;
+  } catch {
+    ALL_VOCABS_FOR_ANALYSIS = vocabularies.slice();
+  }
+}
+
+function runAnalyse() {
+  const input = document.getElementById('analyse-input');
+  const out = document.getElementById('analyse-results');
+  if (!input || !out) return;
+  const form = input.value.trim();
+  if (!form) { out.innerHTML = '<p class="analyse-empty">Bitte eine Form eingeben.</p>'; return; }
+  if (typeof LatinAnalyzer === 'undefined') {
+    out.innerHTML = '<p class="analyse-empty">Analyzer konnte nicht geladen werden.</p>'; return;
+  }
+
+  const { analyses } = LatinAnalyzer.analyze(form);
+  window.__CURRENT_QUERY__ = form;
+  const vocabPool = ALL_VOCABS_FOR_ANALYSIS.length ? ALL_VOCABS_FOR_ANALYSIS : vocabularies;
+  const matches = LatinAnalyzer.matchLemmas(analyses, vocabPool);
+
+  let html = '';
+
+  // Sektion 1: Grammatische Analysen
+  html += `<div class="analyse-card">
+    <h4>Grammatische Analyse für „${esc(form)}"</h4>`;
+  if (analyses.length === 0) {
+    html += '<p class="text-muted">Keine Analyse gefunden. Bitte Schreibweise prüfen.</p>';
+  } else {
+    html += analyses.map(a => `<span class="analyse-chip">${esc(LatinAnalyzer.formatAnalysis(a))}</span>`).join('');
+  }
+  html += `</div>`;
+
+  // Sektion 2: Lemma-Treffer
+  if (matches.length > 0) {
+    // Gruppieren nach Lemma (latin_word)
+    const byLemma = new Map();
+    for (const m of matches) {
+      const k = m.vocab.latin_word;
+      if (!byLemma.has(k)) byLemma.set(k, { vocab: m.vocab, analyses: [] });
+      byLemma.get(k).analyses.push(m.analysis);
+    }
+    html += `<div class="analyse-card"><h4>Passende Vokabeln (${byLemma.size})</h4>`;
+    for (const [, g] of byLemma) {
+      const v = g.vocab;
+      html += `<div style="padding:0.75rem 0; border-bottom:1px solid var(--border);">
+        <div class="analyse-lemma">${esc(v.latin_word)}${v.forms && v.forms !== '-' ? ' <span class="text-muted" style="font-weight:400;">· ' + esc(v.forms) + '</span>' : ''}</div>
+        <div class="analyse-trans">${esc(v.german_translation)}</div>
+        <div class="text-muted" style="font-size:0.8rem; margin-top:0.25rem;">${v.book ? esc(v.book) + ' · ' : ''}Lektion ${v.lesson_number}</div>
+        <div style="margin-top:0.4rem;">${g.analyses.slice(0, 5).map(a => `<span class="analyse-chip">${esc(LatinAnalyzer.formatAnalysis(a))}</span>`).join('')}</div>
+      </div>`;
+    }
+    html += `</div>`;
+  } else if (analyses.length > 0) {
+    html += `<div class="analyse-card"><p class="text-muted">Keine passende Vokabel in den Büchern gefunden.</p></div>`;
+  }
+
+  out.innerHTML = html;
 }
