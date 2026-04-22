@@ -8,239 +8,219 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body data-page="schueler">
-  <header>
-    <div class="header-content">
-      <h1 onclick="goHome();" style="cursor:pointer;">Vokabeltrainer</h1>
-      <div class="header-right">
-        <a href="info.html" class="btn btn-ghost btn-small">Info</a>
-        <span id="logged-in-user" class="user-badge hidden"></span>
-        <button class="btn btn-ghost btn-small" id="logout-btn" onclick="logout();" style="display:none;">Abmelden</button>
-        <button class="btn btn-ghost theme-toggle" id="theme-toggle" title="Dark Mode umschalten">
-          <span class="theme-icon" id="theme-icon">&#9790;</span>
-        </button>
-      </div>
+<main>
+
+  <!-- ==================== HOME ==================== -->
+  <div id="home-view" class="view hidden">
+    <div class="page-header">
+      <h2 id="greeting-title">Willkommen zurück</h2>
+      <p>Wähle ein Vokabelbuch und leg los.</p>
     </div>
-  </header>
 
-  <main class="container">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Vokabeln</div><div class="stat-value" id="stat-total">0</div></div>
+      <div class="stat-card"><div class="stat-label">Geübt</div><div class="stat-value" id="stat-practiced">0</div></div>
+      <div class="stat-card"><div class="stat-label">Gewusst</div><div class="stat-value" id="stat-known">0</div></div>
+      <div class="stat-card"><div class="stat-label">Trefferquote</div><div class="stat-value" id="stat-percentage">0%</div></div>
+    </div>
 
-    <!-- ==================== HOME VIEW ==================== -->
-    <div id="home-view" class="view hidden">
-      <div class="hero">
-        <h2>Vokabeln trainieren</h2>
-        <p>Lade deine Vokabeln hoch und lerne sie mit Karteikarten, Probe-Tests oder richtigen Prüfungen.</p>
-      </div>
-
-      <div class="stats-grid">
-        <div class="stat-card"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Vokabeln gesamt</div></div>
-        <div class="stat-card"><div class="stat-value" id="stat-practiced">0</div><div class="stat-label">Geübt</div></div>
-        <div class="stat-card"><div class="stat-value" id="stat-known">0</div><div class="stat-label">Gewusst</div></div>
-        <div class="stat-card"><div class="stat-value" id="stat-percentage">0%</div><div class="stat-label">Erfolgsquote</div></div>
-      </div>
-
-      <div class="action-grid">
+    <div class="card" style="margin-bottom:1.25rem;">
+      <h3>Was möchtest du tun?</h3>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap:0.75rem; margin-top:1rem;">
         <button class="btn btn-primary btn-large" id="start-btn" disabled onclick="showView('select-view'); renderLessons();">Karteikarten üben</button>
-        <button class="btn btn-secondary btn-large" id="probe-btn" disabled onclick="showProbeSelect();">Probe-Test</button>
-        <button class="btn btn-outline btn-large" id="student-dash-btn" onclick="showView('student-dashboard-view'); loadStudentDashboard();">Meine Tests</button>
-      </div>
-
-      <div class="center" style="margin: 0.5rem 0 1.5rem;">
-        <a href="analyse.html" class="btn btn-accent btn-large">Formen-Analyse</a>
-      </div>
-
-      <div class="center">
-        <button class="btn btn-secondary" id="show-stats-btn">Statistiken anzeigen</button>
-      </div>
-
-      <div id="stats-modal" class="modal hidden">
-        <div class="modal-overlay" id="stats-modal-overlay"></div>
-        <div class="modal-content">
-          <div class="modal-header">
-            <h2>Lektionsstatistik</h2>
-            <button class="btn btn-ghost modal-close" id="close-stats-btn">&times;</button>
-          </div>
-          <div class="modal-body">
-            <div id="bar-chart" class="bar-chart"></div>
-            <div class="chart-legend">
-              <span class="legend-item"><span class="legend-color known"></span> Gewusst</span>
-              <span class="legend-item"><span class="legend-color unknown"></span> Nicht gewusst</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="upload-section">
-        <h3>Vokabelbücher</h3>
-        <p>Wähle ein Buch aus, um seine Vokabeln zu laden:</p>
-        <div id="upload-status"></div>
-        <div id="preset-container" class="book-grid">
-          <p class="text-muted">Lade verfügbare Sammlungen...</p>
-        </div>
+        <button class="btn btn-secondary btn-large" id="probe-btn" disabled onclick="showProbeSelect();">Probe-Test (10 Fragen)</button>
+        <button class="btn btn-secondary btn-large" id="student-dash-btn" onclick="showView('student-dashboard-view'); loadStudentDashboard();">An Test teilnehmen</button>
       </div>
     </div>
 
-    <!-- ==================== LESSON SELECT (Flashcards) ==================== -->
-    <div id="select-view" class="view hidden">
-      <button class="btn btn-ghost" onclick="showView('home-view'); updateStats();">Zurück zur Übersicht</button>
-      <div class="lesson-selector">
-        <h2>Lektionen auswählen</h2>
-        <p>Wähle die Lektionen aus, die du üben möchtest:</p>
-        <div class="lesson-controls">
-          <button class="btn btn-secondary" id="select-all-btn">Alle auswählen</button>
-          <button class="btn btn-secondary" id="deselect-all-btn">Alle abwählen</button>
-        </div>
-        <div id="lessons-grid" class="lessons-grid"></div>
-        <button class="btn btn-primary btn-large" id="start-practice-btn" disabled onclick="startPractice();">Üben starten</button>
+    <div class="card">
+      <h3>Vokabelbücher</h3>
+      <p class="text-muted" style="margin:0.25rem 0 1rem; font-size:0.9rem;">Wähle ein Buch, um seine Vokabeln zu laden.</p>
+      <div id="upload-status"></div>
+      <div id="preset-container" class="book-grid">
+        <p class="text-muted">Lade verfügbare Bücher…</p>
       </div>
     </div>
+  </div>
 
-    <!-- ==================== PRACTICE VIEW (Flashcards) ==================== -->
-    <div id="practice-view" class="view hidden">
-      <button class="btn btn-ghost" onclick="showView('select-view'); renderLessons();">Zurück zur Auswahl</button>
-      <div class="practice-container" id="practice-container">
-        <div class="progress-info">
-          <span id="progress-text">Karte 1 von 10</span>
-          <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
-        </div>
-        <div class="flashcard" id="flashcard">
-          <div class="flashcard-inner">
-            <div class="flashcard-front">
-              <div class="card-label">Latein</div>
-              <div class="card-word" id="latin-word">-</div>
-              <div class="card-hint">Klicken zum Aufdecken</div>
-            </div>
-            <div class="flashcard-back">
-              <div class="card-label">Deutsch</div>
-              <div class="card-word" id="german-word">-</div>
-              <div class="card-forms-back" id="german-forms"></div>
-            </div>
-          </div>
-        </div>
-        <div class="answer-buttons hidden" id="answer-buttons">
-          <button class="btn btn-danger" id="unknown-btn">Nicht gewusst</button>
-          <button class="btn btn-success" id="known-btn">Gewusst</button>
-        </div>
+  <!-- ==================== LESSON SELECT (Flashcards) ==================== -->
+  <div id="select-view" class="view hidden">
+    <button class="btn btn-ghost" onclick="showView('home-view'); updateStats();">← Zurück</button>
+    <div class="page-header" style="margin-top:1rem;">
+      <h2>Karteikarten</h2>
+      <p>Welche Lektionen möchtest du üben?</p>
+    </div>
+    <div class="lesson-controls">
+      <button class="btn btn-secondary btn-small" id="select-all-btn">Alle</button>
+      <button class="btn btn-secondary btn-small" id="deselect-all-btn">Keine</button>
+    </div>
+    <div id="lessons-grid" class="lessons-grid"></div>
+    <button class="btn btn-primary btn-large" id="start-practice-btn" disabled onclick="startPractice();">Üben starten</button>
+  </div>
+
+  <!-- ==================== PRACTICE (Flashcards) ==================== -->
+  <div id="practice-view" class="view hidden">
+    <button class="btn btn-ghost" onclick="showView('select-view'); renderLessons();">← Zurück</button>
+    <div id="practice-container" style="margin-top:1rem;">
+      <div class="progress-info">
+        <span id="progress-text">Karte 1 von 10</span>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
       </div>
-      <div id="results-view" class="hidden">
-        <div class="results-card">
-          <h2>Übung abgeschlossen!</h2>
-          <div class="results-stats">
-            <div class="result-item"><span class="result-value" id="result-total">0</span><span class="result-label">Vokabeln</span></div>
-            <div class="result-item success"><span class="result-value" id="result-known">0</span><span class="result-label">Gewusst</span></div>
-            <div class="result-item danger"><span class="result-value" id="result-unknown">0</span><span class="result-label">Nicht gewusst</span></div>
+      <div class="flashcard" id="flashcard">
+        <div class="flashcard-inner">
+          <div class="flashcard-front">
+            <div class="card-label">Latein</div>
+            <div class="card-word" id="latin-word">-</div>
+            <div class="card-hint">Klicken zum Aufdecken</div>
           </div>
-          <div class="result-percentage"><span id="result-percentage">0%</span> Erfolgsquote</div>
-          <div class="result-actions">
-            <button class="btn btn-warning hidden" id="practice-wrong-btn">Falsche wiederholen</button>
-            <button class="btn btn-secondary" id="practice-again-btn">Nochmal üben</button>
-            <button class="btn btn-primary" id="back-home-btn">Zur Übersicht</button>
+          <div class="flashcard-back">
+            <div class="card-label">Deutsch</div>
+            <div class="card-word" id="german-word">-</div>
+            <div class="card-forms-back" id="german-forms"></div>
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- ==================== PROBE SELECT ==================== -->
-    <div id="probe-select-view" class="view hidden">
-      <button class="btn btn-ghost" onclick="showView('home-view'); updateStats();">Zurück</button>
-      <div class="lesson-selector">
-        <h2>Probe-Test: Lektionen wählen</h2>
-        <p>Wähle die Lektionen für den Probe-Test:</p>
-        <div class="lesson-controls">
-          <button class="btn btn-secondary" onclick="probeSelectAll();">Alle</button>
-          <button class="btn btn-secondary" onclick="probeDeselectAll();">Keine</button>
-        </div>
-        <div id="probe-lessons-grid" class="lessons-grid"></div>
-        <button class="btn btn-primary btn-large" id="start-probe-btn" disabled onclick="startProbeTest();">Test starten</button>
+      <div class="answer-buttons hidden" id="answer-buttons">
+        <button class="btn btn-danger" id="unknown-btn">Nicht gewusst</button>
+        <button class="btn btn-success" id="known-btn">Gewusst</button>
       </div>
     </div>
-
-    <!-- ==================== PROBE TEST ==================== -->
-    <div id="probe-test-view" class="view hidden">
-      <div class="test-container">
-        <div class="progress-info">
-          <span id="probe-progress-text">Frage 1 von 10</span>
-          <div class="progress-bar"><div class="progress-fill" id="probe-progress-fill"></div></div>
+    <div id="results-view" class="hidden" style="margin-top:1rem;">
+      <div class="results-card">
+        <h2>Übung abgeschlossen</h2>
+        <div class="results-stats">
+          <div class="result-item"><span class="result-value" id="result-total">0</span><span class="result-label">Karten</span></div>
+          <div class="result-item success"><span class="result-value" id="result-known">0</span><span class="result-label">Gewusst</span></div>
+          <div class="result-item danger"><span class="result-value" id="result-unknown">0</span><span class="result-label">Nicht gewusst</span></div>
         </div>
-        <div class="test-card">
-          <div class="card-label">Übersetze:</div>
-          <div class="card-word" id="probe-latin-word">-</div>
-          <div class="card-forms" id="probe-forms"></div>
-          <input type="text" class="test-input" id="probe-forms-input" placeholder="Formen eingeben..." autocomplete="off">
-          <input type="text" class="test-input" id="probe-input" placeholder="Deutsche Übersetzung eingeben..." autocomplete="off">
-          <button class="btn btn-primary" onclick="submitProbeAnswer();">Antwort abgeben</button>
+        <div class="result-percentage"><span id="result-percentage">0%</span> Trefferquote</div>
+        <div class="result-actions">
+          <button class="btn btn-warning hidden" id="practice-wrong-btn">Falsche wiederholen</button>
+          <button class="btn btn-secondary" id="practice-again-btn">Nochmal üben</button>
+          <button class="btn btn-primary" id="back-home-btn">Zur Übersicht</button>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- ==================== PROBE RESULTS ==================== -->
-    <div id="probe-results-view" class="view hidden">
-      <div class="results-card" style="text-align:left;">
-        <h2 style="text-align:center;">Probe-Test Ergebnis</h2>
-        <div class="result-percentage" style="text-align:center;"><span id="probe-score">0/0</span></div>
-        <div class="table-wrap">
-          <table class="results-table">
-            <thead><tr><th>Latein</th><th>Formen</th><th>Deine Antwort</th><th>Richtige Antworten</th><th></th></tr></thead>
-            <tbody id="probe-results-body"></tbody>
-          </table>
-        </div>
-        <div class="result-actions" style="margin-top:1.5rem;">
-          <button class="btn btn-secondary" onclick="showView('home-view'); updateStats();">Zurück</button>
-        </div>
+  <!-- ==================== PROBE SELECT ==================== -->
+  <div id="probe-select-view" class="view hidden">
+    <button class="btn btn-ghost" onclick="showView('home-view'); updateStats();">← Zurück</button>
+    <div class="page-header" style="margin-top:1rem;">
+      <h2>Probe-Test</h2>
+      <p>10 zufällige Vokabeln aus den gewählten Lektionen.</p>
+    </div>
+    <div class="lesson-controls">
+      <button class="btn btn-secondary btn-small" onclick="probeSelectAll();">Alle</button>
+      <button class="btn btn-secondary btn-small" onclick="probeDeselectAll();">Keine</button>
+    </div>
+    <div id="probe-lessons-grid" class="lessons-grid"></div>
+    <button class="btn btn-primary btn-large" id="start-probe-btn" disabled onclick="startProbeTest();">Test starten</button>
+  </div>
+
+  <!-- ==================== PROBE TEST ==================== -->
+  <div id="probe-test-view" class="view hidden">
+    <div class="test-container">
+      <div class="progress-info">
+        <span id="probe-progress-text">Frage 1 von 10</span>
+        <div class="progress-bar"><div class="progress-fill" id="probe-progress-fill"></div></div>
+      </div>
+      <div class="test-card">
+        <div class="card-label">Übersetze</div>
+        <div class="card-word" id="probe-latin-word">-</div>
+        <div class="card-forms" id="probe-forms"></div>
+        <input type="text" class="test-input" id="probe-forms-input" placeholder="Formen eingeben…" autocomplete="off">
+        <input type="text" class="test-input" id="probe-input" placeholder="Deutsche Übersetzung…" autocomplete="off">
+        <button class="btn btn-primary btn-block" onclick="submitProbeAnswer();">Antwort abgeben</button>
       </div>
     </div>
+  </div>
 
-    <!-- ==================== STUDENT DASHBOARD ==================== -->
-    <div id="student-dashboard-view" class="view hidden">
-      <button class="btn btn-ghost" onclick="goHome();">Zurück</button>
-      <h2>Meine Tests</h2>
-      <div class="form-group" style="max-width:400px;">
-        <label>Test-ID eingeben</label>
+  <!-- ==================== PROBE RESULTS ==================== -->
+  <div id="probe-results-view" class="view hidden">
+    <div class="results-card">
+      <h2>Probe-Test – Ergebnis</h2>
+      <div class="result-percentage"><span id="probe-score">0/0</span></div>
+      <div class="table-wrap">
+        <table class="results-table">
+          <thead><tr><th>Latein</th><th>Formen</th><th>Deine Antwort</th><th>Richtige Antworten</th><th></th></tr></thead>
+          <tbody id="probe-results-body"></tbody>
+        </table>
+      </div>
+      <div class="result-actions" style="margin-top:1.5rem;">
+        <button class="btn btn-secondary" onclick="showView('home-view'); updateStats();">Zurück</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== STUDENT DASHBOARD (Tests) ==================== -->
+  <div id="student-dashboard-view" class="view hidden">
+    <button class="btn btn-ghost" onclick="goHome();">← Zurück</button>
+    <div class="page-header" style="margin-top:1rem;">
+      <h2>An Test teilnehmen</h2>
+      <p>Gib die Test-ID deines Lehrers ein.</p>
+    </div>
+    <div class="card" style="max-width:480px; margin-bottom:1.25rem;">
+      <div class="form-group" style="margin:0;">
+        <label>Test-ID</label>
         <div class="inline-form">
-          <input type="text" id="student-test-id" placeholder="Test-ID">
-          <button class="btn btn-primary" onclick="studentJoinTest();">Test starten</button>
+          <input type="text" id="student-test-id" placeholder="z.B. K3PQRS">
+          <button class="btn btn-primary" onclick="studentJoinTest();">Starten</button>
         </div>
       </div>
       <div id="student-join-error" class="error-msg"></div>
-      <h3 style="margin-top:2rem;">Bisherige Ergebnisse</h3>
-      <div id="student-results-list"></div>
     </div>
+    <h3>Bisherige Ergebnisse</h3>
+    <div id="student-results-list"></div>
+  </div>
 
-    <!-- ==================== STUDENT TEST ==================== -->
-    <div id="student-test-view" class="view hidden">
-      <div class="test-container">
-        <div class="progress-info">
-          <span id="student-progress-text">Frage 1 von 10</span>
-          <div class="progress-bar"><div class="progress-fill" id="student-progress-fill"></div></div>
-        </div>
-        <div class="test-card">
-          <div class="card-label">Übersetze:</div>
-          <div class="card-word" id="student-latin-word">-</div>
-          <div class="card-forms" id="student-forms"></div>
-          <input type="text" class="test-input" id="student-forms-input" placeholder="Formen eingeben..." autocomplete="off">
-          <input type="text" class="test-input" id="student-input" placeholder="Deutsche Übersetzung eingeben..." autocomplete="off">
-          <button class="btn btn-primary" onclick="submitStudentAnswer();">Antwort abgeben</button>
-        </div>
+  <!-- ==================== STUDENT TEST ==================== -->
+  <div id="student-test-view" class="view hidden">
+    <div class="test-container">
+      <div class="progress-info">
+        <span id="student-progress-text">Frage 1 von 10</span>
+        <div class="progress-bar"><div class="progress-fill" id="student-progress-fill"></div></div>
+      </div>
+      <div class="test-card">
+        <div class="card-label">Übersetze</div>
+        <div class="card-word" id="student-latin-word">-</div>
+        <div class="card-forms" id="student-forms"></div>
+        <input type="text" class="test-input" id="student-forms-input" placeholder="Formen eingeben…" autocomplete="off">
+        <input type="text" class="test-input" id="student-input" placeholder="Deutsche Übersetzung…" autocomplete="off">
+        <button class="btn btn-primary btn-block" onclick="submitStudentAnswer();">Antwort abgeben</button>
       </div>
     </div>
+  </div>
 
-    <!-- ==================== STUDENT TEST RESULTS ==================== -->
-    <div id="student-results-view" class="view hidden">
-      <div class="results-card" style="text-align:left;">
-        <h2 style="text-align:center;">Testergebnis</h2>
-        <div class="result-percentage" style="text-align:center;"><span id="student-score">0/0</span></div>
-        <div class="table-wrap">
-          <table class="results-table">
-            <thead><tr><th>Latein</th><th>Formen</th><th>Deine Antwort</th><th>Richtige Antworten</th><th></th><th>Einspruch</th></tr></thead>
-            <tbody id="student-results-body"></tbody>
-          </table>
-        </div>
-        <div class="result-actions" style="margin-top:1.5rem;">
-          <button class="btn btn-primary" onclick="showView('student-dashboard-view'); loadStudentDashboard();">Zurück</button>
-        </div>
+  <!-- ==================== STUDENT RESULTS ==================== -->
+  <div id="student-results-view" class="view hidden">
+    <div class="results-card">
+      <h2>Testergebnis</h2>
+      <div class="result-percentage"><span id="student-score">0/0</span></div>
+      <div class="table-wrap">
+        <table class="results-table">
+          <thead><tr><th>Latein</th><th>Formen</th><th>Deine Antwort</th><th>Richtige Antworten</th><th></th><th>Einspruch</th></tr></thead>
+          <tbody id="student-results-body"></tbody>
+        </table>
+      </div>
+      <div class="result-actions" style="margin-top:1.5rem;">
+        <button class="btn btn-primary" onclick="showView('student-dashboard-view'); loadStudentDashboard();">Zurück</button>
       </div>
     </div>
+  </div>
 
-  </main>
-  <script src="script.js"></script>
+  <!-- Hidden legacy stats modal (for compatibility) -->
+  <div id="stats-modal" class="modal hidden">
+    <div class="modal-overlay" id="stats-modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header"><h2>Lektionsstatistik</h2><button class="btn btn-ghost modal-close" id="close-stats-btn">×</button></div>
+      <div class="modal-body"><div id="bar-chart"></div></div>
+    </div>
+  </div>
+
+</main>
+<script src="layout.js"></script>
+<script src="auth-check.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
