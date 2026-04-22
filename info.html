@@ -7,76 +7,69 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body data-page="info">
-  <header>
-    <div class="header-content">
-      <h1 onclick="history.back()" style="cursor:pointer;">Vokabeltrainer</h1>
-      <div class="header-right">
-        <a href="javascript:history.back()" class="btn btn-ghost btn-small">Zurück</a>
-        <button class="btn btn-ghost theme-toggle" id="theme-toggle" title="Dark Mode umschalten">
-          <span class="theme-icon" id="theme-icon">&#9790;</span>
-        </button>
-      </div>
-    </div>
-  </header>
+  <div style="position: fixed; top: 1rem; right: 1rem; display:flex; gap:0.5rem; z-index:50;">
+    <button class="btn btn-ghost btn-small" onclick="history.back()">← Zurück</button>
+    <button class="btn btn-ghost icon-btn" id="theme-toggle" title="Hell/Dunkel"><span id="theme-icon">☾</span></button>
+  </div>
 
-  <main class="container">
-    <div class="hero">
+  <div style="max-width: 760px; margin: 3rem auto; padding: 0 1rem;">
+    <div class="page-header" style="text-align:center;">
       <h2>Info & Hilfe</h2>
-      <p>Hier erfährst du, wie der Vokabeltrainer funktioniert und wie deine Antworten korrigiert werden.</p>
+      <p>So funktioniert der Vokabeltrainer.</p>
     </div>
 
     <section class="info-card">
       <h3>So werden deine Antworten korrigiert</h3>
-      <p>Bei jedem Test prüfen wir <strong>zwei Felder</strong>: die <em>Formen</em> (Latein) und die <em>Übersetzung</em> (Deutsch). Beide müssen stimmen, damit die Vokabel als richtig zählt. Hat eine Vokabel keine Formen in der CSV-Datei, wird nur die Übersetzung geprüft.</p>
+      <p>Bei jedem Test prüfen wir <strong>zwei Felder</strong>: die <em>Formen</em> (Latein) und die <em>Übersetzung</em> (Deutsch). Beide müssen stimmen, damit eine Vokabel als richtig zählt. Hat eine Vokabel keine Formen, wird nur die Übersetzung geprüft.</p>
 
       <h4>Übersetzung (Deutsch)</h4>
       <ul>
-        <li>Groß-/Kleinschreibung spielt <strong>keine Rolle</strong>.</li>
-        <li>Artikel (<code>der, die, das, ein, eine, einer, eines, einem, einen</code>) werden <strong>ignoriert</strong> – sowohl in der Lösung als auch in deiner Antwort.</li>
-        <li>Sonderzeichen wie <code>( ) / &amp; % $ § " ! ?</code> werden ignoriert. Es zählen nur Buchstaben (auch ä, ö, ü, ß) und Leerzeichen.</li>
-        <li>In der CSV stehen oft mehrere Übersetzungen, getrennt durch <code>,</code> oder <code>;</code>. Es reicht, wenn deine Eingabe <strong>mindestens eine</strong> dieser Möglichkeiten enthält.</li>
-        <li>Beispiel: Lösung <code>tum = dann, da, darauf, damals</code> → akzeptiert werden „dann", „Da", „darauf!", „und damals", usw.</li>
+        <li>Groß-/Kleinschreibung egal.</li>
+        <li>Artikel (<code>der, die, das, ein, eine, einer, eines, einem, einen</code>) werden ignoriert.</li>
+        <li>Sonderzeichen wie <code>( ) / &amp; % $ § " ! ?</code> werden ignoriert. Nur Buchstaben (auch ä, ö, ü, ß) und Leerzeichen zählen.</li>
+        <li>Stehen mehrere Übersetzungen in den Vokabeln (getrennt durch <code>,</code> oder <code>;</code>), reicht <strong>eine</strong> davon.</li>
+        <li>Beispiel: <code>tum = dann, da, darauf, damals</code> → akzeptiert: „dann", „Da", „darauf!", „und damals".</li>
       </ul>
 
       <h4>Formen (Latein)</h4>
       <ul>
-        <li>Groß-/Kleinschreibung spielt <strong>keine Rolle</strong>.</li>
-        <li>Leerzeichen, Kommas und alle Sonderzeichen werden <strong>komplett entfernt</strong> – sowohl bei dir als auch in der Lösung.</li>
-        <li>Die übrig bleibenden Buchstabenketten müssen <strong>exakt übereinstimmen</strong>.</li>
-        <li>Beispiel: Lösung <code>amo, amare, amavi, amatum</code> → korrekt: „amoamareamaviamatum", „amo amare amavi amatum", „Amo, Amare, Amavi, Amatum".</li>
+        <li>Groß-/Kleinschreibung egal.</li>
+        <li>Leerzeichen, Kommas und alle Sonderzeichen werden komplett entfernt.</li>
+        <li>Die übrigen Buchstaben müssen <strong>exakt</strong> übereinstimmen.</li>
+        <li>Beispiel: <code>amo, amare, amavi, amatum</code> → richtig: „amoamareamaviamatum", „amo amare amavi amatum", „Amo, Amare, Amavi, Amatum".</li>
       </ul>
     </section>
 
     <section class="info-card">
       <h3>Einsprüche</h3>
-      <p>Wenn du der Meinung bist, dass deine Antwort doch richtig war, kannst du in der Ergebnisansicht eines Tests <strong>Einspruch</strong> einreichen. Der Lehrer sieht den Einspruch im Test-Detail und kann ihn entweder <strong>genehmigen</strong> (Vokabel zählt nachträglich als richtig, Punkt wird gutgeschrieben) oder <strong>ablehnen</strong>. Nach der Entscheidung verschwindet der Einspruch wieder aus der Liste.</p>
+      <p>Wenn du der Meinung bist, deine Antwort war doch richtig, kannst du in der Ergebnisansicht <strong>Einspruch</strong> einlegen. Der Lehrer entscheidet: <strong>Genehmigt</strong> = Vokabel zählt als richtig, Punkt wird nachgetragen. <strong>Abgelehnt</strong> = Bewertung bleibt.</p>
     </section>
 
     <section class="info-card">
       <h3>Rollen</h3>
       <ul>
-        <li><strong>Schüler</strong>: Üben mit Karteikarten, Probe-Tests schreiben und an echten Vokabeltests teilnehmen.</li>
-        <li><strong>Lehrer</strong>: Klassen anlegen, Schüler hinzufügen, Tests erstellen, Ergebnisse einsehen und Einsprüche bearbeiten. Für die Registrierung als Lehrer ist ein Code nötig.</li>
+        <li><strong>Schüler</strong>: Üben mit Karteikarten, Probe-Tests schreiben, an echten Vokabeltests teilnehmen.</li>
+        <li><strong>Lehrer</strong>: Klassen anlegen, Schüler hinzufügen, Tests erstellen, Ergebnisse einsehen, Einsprüche bearbeiten. Für die Registrierung als Lehrer ist ein Code nötig.</li>
       </ul>
     </section>
 
     <section class="info-card">
-      <h3>Formen-Analyse</h3>
-      <p>Auf der Seite <a href="analyse.html" style="color:var(--primary);">Formen-Analyse</a> kannst du eine beliebige flektierte lateinische Form eingeben (z.B. <code>amarem</code>, <code>puellae</code>, <code>sumus</code>). Das System erkennt:</p>
+      <h3>Formen-Check</h3>
+      <p>Auf der Seite <a href="analyse.html">Formen-Check</a> kannst du eine beliebige flektierte lateinische Form eingeben (z.B. <code>amarem</code>, <code>puellae</code>, <code>sumus</code>). Das System erkennt:</p>
       <ul>
-        <li><strong>Verben</strong>: Person, Numerus, Tempus (Präsens, Imperfekt, Perfekt, Plusquamperfekt, Futur I/II), Modus (Indikativ, <em>Konjunktiv</em>, Imperativ, Infinitiv), Genus verbi (Aktiv/Passiv)</li>
-        <li><strong>Nomen & Adjektive</strong>: Kasus (Nom, Gen, Dat, Akk, Abl), Numerus, Deklination</li>
-        <li><strong>Partizipien</strong>: PPP, PPA</li>
-        <li><strong>Unregelmäßige Verben</strong>: <em>esse, posse, ferre, ire, velle</em> inkl. Perfektformen (<code>fui</code>, <code>tuli</code>, ...)</li>
+        <li><strong>Verben</strong>: Person, Zahl, Zeit (Präsens, Imperfekt, Perfekt, Plusquamperfekt, Futur I/II), Modus (Indikativ, Konjunktiv, Imperativ, Infinitiv), Aktiv/Passiv.</li>
+        <li><strong>Nomen & Adjektive</strong>: Fall, Zahl, Deklination.</li>
+        <li><strong>Partizipien</strong>: PPP, PPA.</li>
+        <li><strong>Unregelmäßige Verben</strong>: <em>esse, posse, ferre, ire, velle</em> inkl. Perfektformen (<code>fui</code>, <code>tuli</code>…).</li>
       </ul>
-      <p>Da Latein mehrdeutig ist, werden <strong>alle plausiblen Analysen</strong> angezeigt. Zusätzlich sucht das System in den geladenen Vokabelbüchern nach passenden Lemmata.</p>
+      <p>Da Latein mehrdeutig ist, werden alle möglichen Bestimmungen angezeigt. Außerdem suchen wir in den Büchern nach passenden Wörtern.</p>
     </section>
 
     <section class="info-card">
-      <h3>Vokabelbücher</h3>
-      <p>Vokabeln stammen aus den bereitgestellten Büchern (z.B. Adeamus 1 &amp; 2). Ein eigener CSV-Upload ist nicht mehr nötig – wähle einfach ein Buch auf dem Dashboard aus.</p>
+      <h3>Profil & Sicherheit</h3>
+      <p>Auf der <a href="profil.html">Profilseite</a> kannst du deinen Namen und dein Passwort ändern oder deinen Account löschen. Beim ersten Öffnen pro Sitzung prüfen wir, ob dein Account noch existiert – falls nicht, wirst du zur Anmeldung weitergeleitet.</p>
     </section>
-  </main>
+  </div>
   <script src="script.js"></script>
 </body>
 </html>
