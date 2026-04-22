@@ -61,12 +61,20 @@
     </section>
 
     <section class="info-card">
-      <h3>CSV-Format</h3>
-      <p>Vier Spalten pro Zeile, getrennt durch <code>,</code> oder <code>;</code>:</p>
-      <pre><code>Latein,Formen,Deutsche Übersetzung,Lektionsnummer
-amare,"amo, amare, amavi, amatum",lieben,1
-tum,-,"dann, da, darauf, damals",2</code></pre>
-      <p>Steht in der Formen-Spalte ein <code>-</code> oder ist sie leer, wird kein Formen-Eingabefeld angezeigt.</p>
+      <h3>Formen-Analyse</h3>
+      <p>Auf der Seite <a href="analyse.html" style="color:var(--primary);">Formen-Analyse</a> kannst du eine beliebige flektierte lateinische Form eingeben (z.B. <code>amarem</code>, <code>puellae</code>, <code>sumus</code>). Das System erkennt:</p>
+      <ul>
+        <li><strong>Verben</strong>: Person, Numerus, Tempus (Präsens, Imperfekt, Perfekt, Plusquamperfekt, Futur I/II), Modus (Indikativ, <em>Konjunktiv</em>, Imperativ, Infinitiv), Genus verbi (Aktiv/Passiv)</li>
+        <li><strong>Nomen & Adjektive</strong>: Kasus (Nom, Gen, Dat, Akk, Abl), Numerus, Deklination</li>
+        <li><strong>Partizipien</strong>: PPP, PPA</li>
+        <li><strong>Unregelmäßige Verben</strong>: <em>esse, posse, ferre, ire, velle</em> inkl. Perfektformen (<code>fui</code>, <code>tuli</code>, ...)</li>
+      </ul>
+      <p>Da Latein mehrdeutig ist, werden <strong>alle plausiblen Analysen</strong> angezeigt. Zusätzlich sucht das System in den geladenen Vokabelbüchern nach passenden Lemmata.</p>
+    </section>
+
+    <section class="info-card">
+      <h3>Vokabelbücher</h3>
+      <p>Vokabeln stammen aus den bereitgestellten Büchern (z.B. Adeamus 1 &amp; 2). Ein eigener CSV-Upload ist nicht mehr nötig – wähle einfach ein Buch auf dem Dashboard aus.</p>
     </section>
   </main>
   <script src="script.js"></script>
