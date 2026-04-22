@@ -1,4 +1,14 @@
 [
-  { "name": "Adeamus 1", "file": "Adeamus_1.csv" },
-  { "name": "Adeamus 2", "file": "Adeamus_2.csv" }
+  {
+    "name": "Adeamus 1",
+    "file": "Adeamus_1.csv",
+    "cover": "Adeamus_1.jpg",
+    "description": "Lehrwerk Adeamus, Band 1"
+  },
+  {
+    "name": "Adeamus 2",
+    "file": "Adeamus_2.csv",
+    "cover": "Adeamus_2.jpg",
+    "description": "Lehrwerk Adeamus, Band 2"
+  }
 ]
