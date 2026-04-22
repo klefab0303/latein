@@ -3,44 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vokabeltrainer – Formen-Analyse</title>
+  <title>Vokabeltrainer – Formen-Check</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body data-page="analyse">
-  <header>
-    <div class="header-content">
-      <h1 onclick="goAnalyseHome();" style="cursor:pointer;">Vokabeltrainer</h1>
-      <div class="header-right">
-        <a href="info.html" class="btn btn-ghost btn-small">Info</a>
-        <span id="logged-in-user" class="user-badge hidden"></span>
-        <button class="btn btn-ghost btn-small" id="logout-btn" onclick="logout();" style="display:none;">Abmelden</button>
-        <button class="btn btn-ghost theme-toggle" id="theme-toggle" title="Dark Mode umschalten">
-          <span class="theme-icon" id="theme-icon">&#9790;</span>
-        </button>
-      </div>
+<main>
+  <div class="page-header">
+    <h2>Formen-Check</h2>
+    <p>Gib eine lateinische Form ein – wir bestimmen sie und suchen passende Vokabeln in den Büchern.</p>
+  </div>
+
+  <div class="card" style="margin-bottom:1.25rem;">
+    <div class="inline-form">
+      <input type="text" id="analyse-input" class="input" placeholder="z.B. amarem, puellae, sumus…" autocomplete="off">
+      <button class="btn btn-primary" onclick="runAnalyse();">Analysieren</button>
     </div>
-  </header>
+  </div>
 
-  <main class="container">
-    <div id="analyse-view" class="view">
-      <button class="btn btn-ghost" onclick="goAnalyseHome();">Zurück</button>
-      <div class="hero">
-        <h2>Formen-Analyse</h2>
-        <p>Gib eine flektierte lateinische Form ein. Wir zeigen dir alle möglichen grammatischen Bestimmungen und passende Vokabeln aus deinen Büchern.</p>
-      </div>
-
-      <div class="form-group" style="max-width:500px; margin: 1rem auto;">
-        <div class="inline-form">
-          <input type="text" id="analyse-input" placeholder="z.B. amarem, puellae, sumus..." autocomplete="off" style="flex:1;">
-          <button class="btn btn-primary" onclick="runAnalyse();">Analysieren</button>
-        </div>
-      </div>
-
-      <div id="analyse-results" style="margin-top:2rem;"></div>
-    </div>
-  </main>
-  <script src="latin-analyzer.js"></script>
-  <script src="script.js"></script>
+  <div id="analyse-results"></div>
+</main>
+<script src="layout.js"></script>
+<script src="auth-check.js"></script>
+<script src="latin-analyzer.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
