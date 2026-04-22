@@ -102,17 +102,23 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   showLoggedInState();
-  if (PAGE !== 'analyse') showView('home-view');
+  if (PAGE === 'schueler' || PAGE === 'lehrer') showView('home-view');
   if (PAGE === 'schueler') {
     updateStats();
     loadPresetVocabularies();
     setupSchuelerListeners();
+    setGreeting();
   } else if (PAGE === 'lehrer') {
     loadPresetVocabularies();
     setupLehrerListeners();
     loadTeacherDashboard();
+    setGreeting();
   } else if (PAGE === 'analyse') {
     setupAnalyseListeners();
+  } else if (PAGE === 'profil') {
+    initProfilePage();
+  } else if (PAGE === 'statistik') {
+    initStatistikPage();
   }
 });
 
@@ -1262,3 +1268,228 @@ function runAnalyse() {
 
   out.innerHTML = html;
 }
+
+// ============================================================
+// GREETING (personalisiert)
+// ============================================================
+function setGreeting() {
+  const el = document.getElementById('greeting-title');
+  if (!el || !currentUser) return;
+  const h = new Date().getHours();
+  const tod = h < 11 ? 'Guten Morgen' : h < 18 ? 'Hallo' : 'Guten Abend';
+  el.textContent = `${tod}, ${currentUser.vorname}`;
+}
+
+// ============================================================
+// LERNFORTSCHRITT: Karteikarten gewichten (oft falsche zuerst)
+// ============================================================
+function getCardWeight(vocabId) {
+  const rs = practiceResults.filter(r => r.vocabulary_id === vocabId);
+  if (rs.length === 0) return 1; // neue Vokabeln normal
+  const wrong = rs.filter(r => !r.known).length;
+  // Mehr Fehler = höheres Gewicht
+  return 1 + wrong * 1.5;
+}
+function weightedShuffle(arr) {
+  return arr
+    .map(v => ({ v, sortKey: Math.random() / getCardWeight(v.id) }))
+    .sort((a, b) => a.sortKey - b.sortKey)
+    .map(x => x.v);
+}
+
+// Override startPractice to use weighted shuffle
+const _origStartPractice = startPractice;
+startPractice = function () {
+  const pool = vocabularies.filter(v => selectedLessons.includes(v.lesson_number));
+  if (pool.length === 0) { alert('Keine Vokabeln gefunden.'); return; }
+  currentPracticeCards = weightedShuffle(pool);
+  currentCardIndex = 0;
+  sessionResults = { known: 0, unknown: 0, wrongCards: [] };
+  showView('practice-view');
+  document.getElementById('practice-container').classList.remove('hidden');
+  document.getElementById('results-view').classList.add('hidden');
+  showCard();
+};
+
+// ============================================================
+// LEHRER-DASHBOARD: erweiterte Stats
+// ============================================================
+const _origLoadTeacherDashboard = loadTeacherDashboard;
+loadTeacherDashboard = async function () {
+  if (!db || !currentUser || currentUser.rolle !== 'lehrer') return;
+  const { data: classes } = await db.from('classes').select('*').eq('teacher_id', currentUser.id).order('created_at');
+  const container = document.getElementById('classes-list');
+  if (!classes || classes.length === 0) {
+    if (container) container.innerHTML = '<p class="text-muted">Noch keine Klassen angelegt.</p>';
+  } else if (container) {
+    container.innerHTML = classes.map(c => `
+      <div class="card-item" onclick="selectClass('${c.id}', '${esc(c.name)}')">
+        <h4>${esc(c.name)}</h4>
+        <p class="text-muted">Erstellt: ${new Date(c.created_at).toLocaleDateString('de-DE')}</p>
+      </div>`).join('');
+  }
+  // Stats
+  const setT = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setT('t-stat-classes', (classes || []).length);
+  // Tests + Appeals zählen
+  const classIds = (classes || []).map(c => c.id);
+  if (classIds.length === 0) {
+    setT('t-stat-tests', 0);
+    setT('t-stat-appeals', 0);
+    return;
+  }
+  const { data: tests } = await db.from('tests').select('id').in('class_id', classIds);
+  setT('t-stat-tests', (tests || []).length);
+  const testIds = (tests || []).map(t => t.id);
+  if (testIds.length === 0) { setT('t-stat-appeals', 0); return; }
+  const { data: results } = await db.from('results').select('id').in('test_id', testIds);
+  const resIds = (results || []).map(r => r.id);
+  if (resIds.length === 0) { setT('t-stat-appeals', 0); return; }
+  const { count } = await db.from('appeals').select('*', { count: 'exact', head: true }).in('result_id', resIds);
+  setT('t-stat-appeals', count || 0);
+};
+
+// ============================================================
+// PROFIL-SEITE
+// ============================================================
+function initProfilePage() {
+  if (!currentUser) return;
+  // Avatar + Name
+  const av = document.getElementById('profil-avatar');
+  const initials = ((currentUser.vorname || '?')[0] + (currentUser.nachname || '')[0]).toUpperCase();
+  if (av) av.textContent = initials;
+  const nm = document.getElementById('profil-name');
+  if (nm) nm.textContent = `${currentUser.vorname} ${currentUser.nachname}`;
+  const meta = document.getElementById('profil-meta');
+  if (meta) meta.textContent = `${currentUser.benutzername} · ${currentUser.rolle === 'lehrer' ? 'Lehrer' : 'Schüler'}`;
+  // Felder vorbelegen
+  const v = document.getElementById('prof-vorname');
+  const n = document.getElementById('prof-nachname');
+  if (v) v.value = currentUser.vorname || '';
+  if (n) n.value = currentUser.nachname || '';
+}
+
+async function saveName() {
+  const v = document.getElementById('prof-vorname').value.trim();
+  const n = document.getElementById('prof-nachname').value.trim();
+  const msg = document.getElementById('name-msg');
+  msg.textContent = ''; msg.className = 'success-msg';
+  if (!v || !n) { msg.className = 'error-msg'; msg.textContent = 'Bitte beide Felder ausfüllen.'; return; }
+  if (!db) { msg.className = 'error-msg'; msg.textContent = 'Keine Datenbankverbindung.'; return; }
+  const { error } = await db.from('users').update({ vorname: v, nachname: n }).eq('id', currentUser.id);
+  if (error) { msg.className = 'error-msg'; msg.textContent = 'Fehler beim Speichern.'; return; }
+  currentUser.vorname = v; currentUser.nachname = n;
+  localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+  msg.textContent = 'Gespeichert. Lade die Seite neu, um den Namen überall zu sehen.';
+  initProfilePage();
+}
+
+async function changePassword() {
+  const oldPw = document.getElementById('pw-old').value;
+  const newPw = document.getElementById('pw-new').value;
+  const newPw2 = document.getElementById('pw-new2').value;
+  const msg = document.getElementById('pw-msg');
+  msg.textContent = ''; msg.className = 'success-msg';
+  if (!oldPw || !newPw || !newPw2) { msg.className = 'error-msg'; msg.textContent = 'Bitte alle Felder ausfüllen.'; return; }
+  if (newPw !== newPw2) { msg.className = 'error-msg'; msg.textContent = 'Die neuen Passwörter stimmen nicht überein.'; return; }
+  if (newPw.length < 4) { msg.className = 'error-msg'; msg.textContent = 'Neues Passwort braucht mindestens 4 Zeichen.'; return; }
+  if (oldPw !== currentUser.passwort) { msg.className = 'error-msg'; msg.textContent = 'Aktuelles Passwort ist falsch.'; return; }
+  const { error } = await db.from('users').update({ passwort: newPw }).eq('id', currentUser.id);
+  if (error) { msg.className = 'error-msg'; msg.textContent = 'Fehler beim Ändern.'; return; }
+  currentUser.passwort = newPw;
+  localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+  document.getElementById('pw-old').value = '';
+  document.getElementById('pw-new').value = '';
+  document.getElementById('pw-new2').value = '';
+  msg.textContent = 'Passwort geändert.';
+}
+
+async function deleteAccount() {
+  if (!confirm('Account wirklich endgültig löschen? Das kann nicht rückgängig gemacht werden.')) return;
+  if (!confirm('Letzte Warnung: alle deine Daten werden gelöscht. Fortfahren?')) return;
+  if (!db) return alert('Keine Datenbankverbindung.');
+  const { error } = await db.from('users').delete().eq('id', currentUser.id);
+  if (error) return alert('Fehler beim Löschen: ' + error.message);
+  localStorage.removeItem(USER_KEY);
+  sessionStorage.clear();
+  alert('Dein Account wurde gelöscht.');
+  window.location.href = 'index.html';
+}
+
+// ============================================================
+// STATISTIK-SEITE
+// ============================================================
+async function initStatistikPage() {
+  // Karteikarten-Stats (lokal)
+  const total = vocabularies.length;
+  const practiced = practiceResults.length;
+  const known = practiceResults.filter(r => r.known).length;
+  const pct = practiced > 0 ? Math.round((known / practiced) * 100) : 0;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('stat-total', total);
+  set('stat-practiced', practiced);
+  set('stat-percentage', pct + '%');
+
+  // Test-Historie
+  let tests = [];
+  if (db && currentUser) {
+    const { data } = await db.from('results').select('*, tests(name)').eq('student_id', currentUser.id).order('created_at', { ascending: false });
+    tests = data || [];
+  }
+  set('stat-tests', tests.length);
+  const histEl = document.getElementById('test-history');
+  if (histEl) {
+    if (tests.length === 0) {
+      histEl.innerHTML = '<p class="text-muted">Noch keine Tests absolviert.</p>';
+    } else {
+      histEl.innerHTML = `<div class="table-wrap"><table class="results-table">
+        <thead><tr><th>Test</th><th>Ergebnis</th><th>Datum</th></tr></thead>
+        <tbody>${tests.map(r => `
+          <tr>
+            <td>${r.tests ? esc(r.tests.name) : esc(r.test_id)}</td>
+            <td>${r.score} / ${r.total}</td>
+            <td>${new Date(r.created_at).toLocaleDateString('de-DE')}</td>
+          </tr>`).join('')}
+        </tbody></table></div>`;
+    }
+  }
+
+  // Lektionsfortschritt
+  const lessonMap = new Map();
+  vocabularies.forEach(v => {
+    if (!lessonMap.has(v.lesson_number)) lessonMap.set(v.lesson_number, { total: 0, known: 0, unknown: 0 });
+    lessonMap.get(v.lesson_number).total++;
+  });
+  practiceResults.forEach(r => {
+    const vocab = vocabularies.find(v => v.id === r.vocabulary_id);
+    if (vocab && lessonMap.has(vocab.lesson_number)) {
+      const s = lessonMap.get(vocab.lesson_number);
+      if (r.known) s.known++; else s.unknown++;
+    }
+  });
+  const lessons = Array.from(lessonMap.entries()).sort((a, b) => a[0] - b[0]);
+  const lpEl = document.getElementById('lesson-progress');
+  if (lpEl) {
+    if (lessons.length === 0) lpEl.innerHTML = '<p class="text-muted">Noch keine Vokabeln geladen.</p>';
+    else {
+      lpEl.innerHTML = lessons.map(([num, s]) => {
+        const tot = s.known + s.unknown;
+        const p = tot > 0 ? Math.round((s.known / tot) * 100) : 0;
+        return `<div class="lesson-progress-row">
+          <span class="lp-label">L${num}</span>
+          <div class="lp-bar"><div class="lp-bar-fill" style="width:${p}%"></div></div>
+          <span class="lp-pct">${tot > 0 ? p + '%' : '–'}</span>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // Bar-Chart wiederverwenden
+  if (document.getElementById('bar-chart')) renderBarChart();
+}
+
+// Expose globally for inline onclick handlers
+window.saveName = saveName;
+window.changePassword = changePassword;
+window.deleteAccount = deleteAccount;
+window.logout = logout;
