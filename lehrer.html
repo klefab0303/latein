@@ -32,16 +32,10 @@
       </div>
 
       <div class="upload-section">
-        <h3>Vokabeln hochladen</h3>
-        <p>CSV-Datei mit 4 Spalten: Wort, Formen, Deutsche Übersetzung, Lektionsnummer. Diese Vokabeln werden für die Test-Erstellung verwendet.</p>
-        <input type="file" id="csv-input" accept=".csv" />
+        <h3>Vokabelbücher</h3>
+        <p>Wähle ein Buch aus, dessen Vokabeln für die Test-Erstellung verwendet werden sollen:</p>
         <div id="upload-status"></div>
-      </div>
-
-      <div class="upload-section" style="margin-top: 1rem;">
-        <h3>Voreingestellte Vokabeln</h3>
-        <p>Wähle eine Sammlung aus, um sie direkt zu laden:</p>
-        <div id="preset-container" class="preset-grid">
+        <div id="preset-container" class="book-grid">
           <p class="text-muted">Lade verfügbare Sammlungen...</p>
         </div>
       </div>
@@ -54,6 +48,10 @@
         </div>
       </div>
       <div id="classes-list" class="card-grid"></div>
+
+      <div class="center" style="margin-top:1.5rem;">
+        <a href="analyse.html" class="btn btn-accent">Formen-Analyse öffnen</a>
+      </div>
 
       <p class="text-muted" style="margin-top:2rem; font-size:0.9rem;">
         Wie werden Schülerantworten korrigiert? Siehe <a href="info.html" style="color:var(--primary);">Info-Seite</a>.
