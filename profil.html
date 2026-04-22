@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vokabeltrainer – Profil</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body data-page="profil">
+  <main>
+    <div class="page-header">
+      <h2>Profil</h2>
+      <p>Verwalte deinen Account, ändere dein Passwort oder lösche deinen Zugang.</p>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.25rem;">
+      <h3>Dein Account</h3>
+      <div style="display:flex; align-items:center; gap:1rem; margin: 1rem 0;">
+        <div class="user-avatar" id="profil-avatar" style="width:56px; height:56px; font-size:1.1rem;">?</div>
+        <div>
+          <div style="font-weight:600; font-size:1.1rem;" id="profil-name">–</div>
+          <div class="text-muted" style="font-size:0.9rem;" id="profil-meta">–</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.25rem;">
+      <h3>Name ändern</h3>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem;">
+        <div class="form-group" style="margin:0;">
+          <label>Vorname</label>
+          <input type="text" id="prof-vorname">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>Nachname</label>
+          <input type="text" id="prof-nachname">
+        </div>
+      </div>
+      <div style="margin-top: 1rem;">
+        <button class="btn btn-primary" onclick="saveName();">Speichern</button>
+        <span id="name-msg" class="success-msg" style="margin-left:0.5rem;"></span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.25rem;">
+      <h3>Passwort ändern</h3>
+      <div class="form-group">
+        <label>Aktuelles Passwort</label>
+        <input type="password" id="pw-old">
+      </div>
+      <div class="form-group">
+        <label>Neues Passwort</label>
+        <input type="password" id="pw-new">
+      </div>
+      <div class="form-group">
+        <label>Neues Passwort wiederholen</label>
+        <input type="password" id="pw-new2">
+      </div>
+      <button class="btn btn-primary" onclick="changePassword();">Passwort ändern</button>
+      <span id="pw-msg" class="success-msg" style="margin-left:0.5rem;"></span>
+    </div>
+
+    <div class="card" style="border-color: var(--danger);">
+      <h3 style="color: var(--danger);">Account löschen</h3>
+      <p class="text-muted" style="margin: 0.5rem 0 1rem;">
+        Damit werden auch alle deine Testergebnisse${' '} und – wenn du Lehrer bist – deine Klassen und Tests <strong>endgültig</strong> entfernt. Das kann nicht rückgängig gemacht werden.
+      </p>
+      <button class="btn btn-danger" onclick="deleteAccount();">Account endgültig löschen</button>
+    </div>
+  </main>
+  <script src="layout.js"></script>
+  <script src="auth-check.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
