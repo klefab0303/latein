@@ -44,6 +44,10 @@
         <button class="btn btn-outline btn-large" id="student-dash-btn" onclick="showView('student-dashboard-view'); loadStudentDashboard();">Meine Tests</button>
       </div>
 
+      <div class="center" style="margin: 0.5rem 0 1.5rem;">
+        <a href="analyse.html" class="btn btn-accent btn-large">Formen-Analyse</a>
+      </div>
+
       <div class="center">
         <button class="btn btn-secondary" id="show-stats-btn">Statistiken anzeigen</button>
       </div>
@@ -66,16 +70,10 @@
       </div>
 
       <div class="upload-section">
-        <h3>Vokabeln hochladen</h3>
-        <p>CSV-Datei mit 4 Spalten: Wort, Formen, Deutsche Übersetzung, Lektionsnummer</p>
-        <input type="file" id="csv-input" accept=".csv" />
+        <h3>Vokabelbücher</h3>
+        <p>Wähle ein Buch aus, um seine Vokabeln zu laden:</p>
         <div id="upload-status"></div>
-      </div>
-
-      <div class="upload-section" style="margin-top: 1rem;">
-        <h3>Voreingestellte Vokabeln</h3>
-        <p>Wähle eine Sammlung aus, um sie direkt zu laden:</p>
-        <div id="preset-container" class="preset-grid">
+        <div id="preset-container" class="book-grid">
           <p class="text-muted">Lade verfügbare Sammlungen...</p>
         </div>
       </div>
