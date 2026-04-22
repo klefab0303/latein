@@ -8,152 +8,144 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body data-page="lehrer">
-  <header>
-    <div class="header-content">
-      <h1 onclick="goHome();" style="cursor:pointer;">Vokabeltrainer</h1>
-      <div class="header-right">
-        <a href="info.html" class="btn btn-ghost btn-small">Info</a>
-        <span id="logged-in-user" class="user-badge hidden"></span>
-        <button class="btn btn-ghost btn-small" id="logout-btn" onclick="logout();" style="display:none;">Abmelden</button>
-        <button class="btn btn-ghost theme-toggle" id="theme-toggle" title="Dark Mode umschalten">
-          <span class="theme-icon" id="theme-icon">&#9790;</span>
-        </button>
+<main>
+
+  <!-- ==================== HOME = Lehrer-Dashboard ==================== -->
+  <div id="home-view" class="view hidden">
+    <div class="page-header">
+      <h2 id="greeting-title">Lehrer-Übersicht</h2>
+      <p>Verwalte Klassen, wähle Vokabelbücher und erstelle Tests.</p>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Klassen</div><div class="stat-value" id="t-stat-classes">0</div></div>
+      <div class="stat-card"><div class="stat-label">Tests</div><div class="stat-value" id="t-stat-tests">0</div></div>
+      <div class="stat-card"><div class="stat-label">Offene Einsprüche</div><div class="stat-value" id="t-stat-appeals">0</div></div>
+      <div class="stat-card"><div class="stat-label">Vokabeln geladen</div><div class="stat-value" id="stat-total">0</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.25rem;">
+      <h3>Vokabelbücher</h3>
+      <p class="text-muted" style="margin:0.25rem 0 1rem; font-size:0.9rem;">Wähle ein Buch, um seine Vokabeln für die Test-Erstellung zu nutzen.</p>
+      <div id="upload-status"></div>
+      <div id="preset-container" class="book-grid">
+        <p class="text-muted">Lade Bücher…</p>
       </div>
     </div>
-  </header>
 
-  <main class="container">
-
-    <!-- ==================== HOME = TEACHER DASHBOARD ==================== -->
-    <div id="home-view" class="view hidden">
-      <div class="hero">
-        <h2>Lehrer-Dashboard</h2>
-        <p>Verwalte deine Klassen, lade Vokabeln und erstelle Vokabeltests.</p>
-      </div>
-
-      <div class="upload-section">
-        <h3>Vokabelbücher</h3>
-        <p>Wähle ein Buch aus, dessen Vokabeln für die Test-Erstellung verwendet werden sollen:</p>
-        <div id="upload-status"></div>
-        <div id="preset-container" class="book-grid">
-          <p class="text-muted">Lade verfügbare Sammlungen...</p>
-        </div>
-      </div>
-
-      <div class="section-header" style="margin-top:2rem;">
-        <h3>Meine Klassen</h3>
+    <div class="card">
+      <div class="section-header" style="margin:0 0 1rem;">
+        <h3 style="margin:0;">Meine Klassen</h3>
         <div class="inline-form">
           <input type="text" id="new-class-name" placeholder="Klassenname">
           <button class="btn btn-primary" onclick="createClass();">Anlegen</button>
         </div>
       </div>
       <div id="classes-list" class="card-grid"></div>
+    </div>
+  </div>
 
-      <div class="center" style="margin-top:1.5rem;">
-        <a href="analyse.html" class="btn btn-accent">Formen-Analyse öffnen</a>
-      </div>
+  <!-- Hidden compat -->
+  <div class="hidden">
+    <span id="stat-practiced"></span><span id="stat-known"></span><span id="stat-percentage"></span>
+  </div>
 
-      <p class="text-muted" style="margin-top:2rem; font-size:0.9rem;">
-        Wie werden Schülerantworten korrigiert? Siehe <a href="info.html" style="color:var(--primary);">Info-Seite</a>.
-      </p>
+  <!-- ==================== CLASS VIEW ==================== -->
+  <div id="class-view" class="view hidden">
+    <button class="btn btn-ghost" onclick="goHome();">← Zurück</button>
+    <div class="section-header" style="margin-top:1rem;">
+      <h2 id="class-title">Klasse</h2>
+      <button class="btn btn-danger btn-small" onclick="deleteClass();">Klasse löschen</button>
     </div>
 
-    <!-- Hidden stats container (referenced by stats fns; teachers don't see it) -->
-    <div class="hidden">
-      <span id="stat-total"></span><span id="stat-practiced"></span>
-      <span id="stat-known"></span><span id="stat-percentage"></span>
-      <button id="start-btn"></button><button id="probe-btn"></button>
-    </div>
-
-    <!-- ==================== CLASS VIEW ==================== -->
-    <div id="class-view" class="view hidden">
-      <button class="btn btn-ghost" onclick="goHome();">Zurück</button>
-      <div class="section-header">
-        <h2 id="class-title">Klasse</h2>
-        <button class="btn btn-danger btn-small" onclick="deleteClass();">Klasse löschen</button>
-      </div>
-
-      <div class="section-header">
-        <h3>Schüler</h3>
-      </div>
+    <div class="card" style="margin-bottom:1.25rem;">
+      <h3>Schüler</h3>
+      <p class="text-muted" style="margin:0.25rem 0 0.85rem; font-size:0.9rem;">Suche nach Vorname, Nachname oder Benutzername.</p>
       <div class="student-search-wrap">
-        <input type="text" id="student-search-input" placeholder="Schüler suchen (Name, Nachname oder Benutzername)..." autocomplete="off">
+        <input type="text" id="student-search-input" placeholder="Schüler suchen…" autocomplete="off">
         <div id="student-search-dropdown" class="student-dropdown hidden"></div>
       </div>
       <div id="class-students-list"></div>
       <div id="add-student-error" class="error-msg"></div>
+    </div>
 
-      <div class="section-header" style="margin-top:2rem;">
-        <h3>Vokabeltests</h3>
-        <button class="btn btn-primary btn-small" onclick="showView('test-create-view'); renderTestLessons();">Neuen Test erstellen</button>
+    <div class="card">
+      <div class="section-header" style="margin:0 0 1rem;">
+        <h3 style="margin:0;">Vokabeltests</h3>
+        <button class="btn btn-primary btn-small" onclick="showView('test-create-view'); renderTestLessons();">Neuer Test</button>
       </div>
       <div id="tests-list" class="card-grid"></div>
     </div>
+  </div>
 
-    <!-- ==================== TEST CREATE ==================== -->
-    <div id="test-create-view" class="view hidden">
-      <button class="btn btn-ghost" onclick="showView('class-view'); loadClassData();">Zurück</button>
-      <div class="lesson-selector">
-        <h2>Neuen Test erstellen</h2>
-        <div class="form-group">
-          <label>Testname</label>
-          <input type="text" id="test-name" placeholder="z.B. Vokabeltest Lektion 1-3">
-        </div>
-        <div class="form-group">
-          <label>Anzahl Fragen</label>
-          <input type="number" id="test-question-count" value="10" min="1" max="50">
-        </div>
-        <p>Lektionen auswählen:</p>
-        <div class="lesson-controls">
-          <button class="btn btn-secondary" onclick="testSelectAll();">Alle</button>
-          <button class="btn btn-secondary" onclick="testDeselectAll();">Keine</button>
-        </div>
-        <div id="test-lessons-grid" class="lessons-grid"></div>
-        <button class="btn btn-primary btn-large" onclick="createTest();">Test erstellen</button>
+  <!-- ==================== TEST CREATE ==================== -->
+  <div id="test-create-view" class="view hidden">
+    <button class="btn btn-ghost" onclick="showView('class-view'); loadClassData();">← Zurück</button>
+    <div class="page-header" style="margin-top:1rem;">
+      <h2>Neuer Vokabeltest</h2>
+    </div>
+    <div class="card">
+      <div class="form-group">
+        <label>Name des Tests</label>
+        <input type="text" id="test-name" placeholder="z.B. Vokabeltest Lektion 1–3">
       </div>
+      <div class="form-group">
+        <label>Anzahl Fragen</label>
+        <input type="number" id="test-question-count" value="10" min="1" max="50">
+      </div>
+      <p style="margin-top:0.5rem;">Lektionen wählen:</p>
+      <div class="lesson-controls">
+        <button class="btn btn-secondary btn-small" onclick="testSelectAll();">Alle</button>
+        <button class="btn btn-secondary btn-small" onclick="testDeselectAll();">Keine</button>
+      </div>
+      <div id="test-lessons-grid" class="lessons-grid"></div>
+      <button class="btn btn-primary btn-large" onclick="createTest();">Test erstellen</button>
+    </div>
+  </div>
+
+  <!-- ==================== TEST DETAIL ==================== -->
+  <div id="test-detail-view" class="view hidden">
+    <button class="btn btn-ghost" onclick="showView('class-view'); loadClassData();">← Zurück</button>
+    <div class="section-header" style="margin-top:1rem;">
+      <h2 id="test-detail-title">Test</h2>
+      <button class="btn btn-danger btn-small" onclick="deleteTest();">Test löschen</button>
+    </div>
+    <p>Test-ID zum Teilen: <strong id="test-detail-id" class="test-id-display"></strong></p>
+
+    <h3 style="margin-top:1.5rem;">Ergebnisse</h3>
+    <div class="table-wrap">
+      <table class="results-table">
+        <thead><tr><th>Schüler</th><th>Ergebnis</th><th>Datum</th><th></th></tr></thead>
+        <tbody id="test-results-body"></tbody>
+      </table>
     </div>
 
-    <!-- ==================== TEST DETAIL ==================== -->
-    <div id="test-detail-view" class="view hidden">
-      <button class="btn btn-ghost" onclick="showView('class-view'); loadClassData();">Zurück</button>
-      <div class="section-header">
-        <h2 id="test-detail-title">Test</h2>
-        <button class="btn btn-danger btn-small" onclick="deleteTest();">Test löschen</button>
-      </div>
-      <p>Test-ID zum Teilen: <strong id="test-detail-id" class="test-id-display"></strong></p>
-
-      <h3>Ergebnisse</h3>
-      <div class="table-wrap">
-        <table class="results-table">
-          <thead><tr><th>Schüler</th><th>Ergebnis</th><th>Datum</th><th></th></tr></thead>
-          <tbody id="test-results-body"></tbody>
-        </table>
-      </div>
-
-      <h3 style="margin-top:2rem;">Einsprüche</h3>
-      <div class="table-wrap">
-        <table class="results-table">
-          <thead><tr><th>Schüler</th><th>Latein</th><th>Antwort</th><th>Richtig</th><th>Aktion</th></tr></thead>
-          <tbody id="appeals-body"></tbody>
-        </table>
-      </div>
-      <p id="no-appeals" class="text-muted hidden">Keine offenen Einsprüche.</p>
+    <h3 style="margin-top:2rem;">Einsprüche</h3>
+    <div class="table-wrap">
+      <table class="results-table">
+        <thead><tr><th>Schüler</th><th>Latein</th><th>Antwort</th><th>Richtig</th><th>Aktion</th></tr></thead>
+        <tbody id="appeals-body"></tbody>
+      </table>
     </div>
+    <p id="no-appeals" class="text-muted hidden" style="margin-top:0.75rem;">Keine offenen Einsprüche.</p>
+  </div>
 
-    <!-- ==================== STUDENT ANSWERS ==================== -->
-    <div id="student-answers-view" class="view hidden">
-      <button class="btn btn-ghost" onclick="backToTestDetail();">Zurück</button>
-      <h2>Antworten: <span id="student-answers-name"></span></h2>
-      <p>Ergebnis: <strong id="student-answers-score"></strong></p>
-      <div class="table-wrap">
-        <table class="results-table">
-          <thead><tr><th>Latein</th><th>Antwort</th><th>Richtig</th><th></th></tr></thead>
-          <tbody id="student-answers-body"></tbody>
-        </table>
-      </div>
+  <!-- ==================== STUDENT ANSWERS ==================== -->
+  <div id="student-answers-view" class="view hidden">
+    <button class="btn btn-ghost" onclick="backToTestDetail();">← Zurück</button>
+    <h2 style="margin-top:1rem;">Antworten: <span id="student-answers-name"></span></h2>
+    <p>Ergebnis: <strong id="student-answers-score"></strong></p>
+    <div class="table-wrap">
+      <table class="results-table">
+        <thead><tr><th>Latein</th><th>Antwort</th><th>Richtig</th><th></th></tr></thead>
+        <tbody id="student-answers-body"></tbody>
+      </table>
     </div>
+  </div>
 
-  </main>
-  <script src="script.js"></script>
+</main>
+<script src="layout.js"></script>
+<script src="auth-check.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
