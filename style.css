@@ -611,3 +611,78 @@ p { color: var(--text); }
 .lp-bar { height: 6px; background: var(--surface-hover); border-radius: 99px; overflow: hidden; }
 .lp-bar-fill { height: 100%; background: var(--primary); border-radius: 99px; }
 .lp-pct { text-align: right; color: var(--text-muted); font-size: 0.85rem; }
+
+/* Sidebar classes section + sub-links */
+.sidebar-classes { padding: 0 0.25rem; max-height: 200px; overflow-y: auto; }
+.sidebar-classes-empty { display: block; padding: 0.4rem 0.85rem; font-size: 0.82rem; color: var(--text-soft); }
+.nav-link-sub { font-size: 0.86rem; padding: 0.4rem 0.75rem; color: var(--text-muted); }
+.nav-link-sub .nav-icon svg { width: 16px; height: 16px; }
+.nav-link .nav-icon svg { width: 18px; height: 18px; }
+.icon-btn svg { width: 18px; height: 18px; }
+.user-avatar svg { width: 18px; height: 18px; }
+
+/* Vocab hits in analyse */
+.vocab-hit { padding: 0.7rem 0; border-bottom: 1px solid var(--border); }
+.vocab-hit:last-child { border-bottom: none; }
+
+/* Lesson progress: scroll if many lessons */
+.lesson-progress-list { max-height: 480px; overflow-y: auto; padding-right: 0.25rem; }
+
+/* Heatmap */
+.heatmap-grid {
+  display: grid; grid-template-rows: repeat(7, 14px);
+  grid-auto-flow: column; grid-auto-columns: 14px;
+  gap: 3px; overflow-x: auto; padding-bottom: 0.5rem;
+}
+.hm-cell { width: 14px; height: 14px; border-radius: 3px; background: var(--surface-hover); }
+.hm-empty { background: transparent; }
+.hm-l0 { background: var(--surface-hover); }
+.hm-l1 { background: rgba(0,113,227,0.25); }
+.hm-l2 { background: rgba(0,113,227,0.45); }
+.hm-l3 { background: rgba(0,113,227,0.7); }
+.hm-l4 { background: var(--primary); }
+html.dark .hm-l1 { background: rgba(10,132,255,0.25); }
+html.dark .hm-l2 { background: rgba(10,132,255,0.5); }
+html.dark .hm-l3 { background: rgba(10,132,255,0.75); }
+.heatmap-legend { display: flex; align-items: center; gap: 4px; margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-muted); }
+.heatmap-legend .hm-cell { display: inline-block; }
+
+/* Hardest words */
+.hardest-list { display: flex; flex-direction: column; gap: 0.45rem; }
+.hardest-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.6rem 0.85rem; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--surface);
+}
+
+/* Line chart */
+.line-chart { width: 100%; height: auto; max-height: 220px; }
+
+/* Profil class list */
+.profil-class { padding: 0.85rem 0; border-bottom: 1px solid var(--border); }
+.profil-class:last-child { border-bottom: none; }
+.profil-class-header { font-weight: 600; margin-bottom: 0.35rem; }
+.profil-test-list { list-style: none; padding: 0; margin: 0.35rem 0 0; }
+.profil-test-list li {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.45rem 0; font-size: 0.9rem; border-top: 1px solid var(--border);
+}
+.profil-test-list li:first-child { border-top: none; }
+
+/* FAQ items (info page) */
+.faq-item {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 0.6rem; overflow: hidden;
+}
+.faq-item summary {
+  padding: 1rem 1.2rem; cursor: pointer; font-weight: 500;
+  list-style: none; display: flex; justify-content: space-between; align-items: center;
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::after { content: '+'; font-size: 1.3rem; color: var(--text-muted); margin-left: 1rem; }
+.faq-item[open] summary::after { content: '−'; }
+.faq-item summary:hover { background: var(--surface-hover); }
+.faq-body { padding: 0 1.2rem 1.1rem; color: var(--text); }
+.faq-body h4 { margin: 0.85rem 0 0.4rem; }
+.faq-body ul { margin: 0.4rem 0 0.6rem 1.25rem; }
+.faq-body code { background: var(--surface-hover); padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.88em; }

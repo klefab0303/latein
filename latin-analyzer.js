@@ -1,397 +1,212 @@
 // ============================================================
-// LATIN FORMS ANALYZER
-// Regelbasierte Analyse flektierter lateinischer Formen.
-// Liefert mögliche grammatische Bestimmungen + Lemma-Kandidaten.
-// Mehrdeutigkeiten werden absichtlich ALLE zurückgegeben.
+// LATIN FORMS ANALYZER (vereinfacht)
+// Liefert: Verb (Person, Numerus, Tempus, Modus, Genus Verbi)
+//          Nomen (Kasus, Numerus, Genus)
+// Keine Deklinations-Nummer mehr.
 // ============================================================
-
 (function (global) {
   'use strict';
 
-  // ---------- Hilfsfunktionen ----------
   const norm = (s) => (s || '').toLowerCase().trim()
     .replace(/[āăáà]/g, 'a').replace(/[ēĕéè]/g, 'e')
     .replace(/[īĭíì]/g, 'i').replace(/[ōŏóò]/g, 'o')
-    .replace(/[ūŭúù]/g, 'u').replace(/[ȳ]/g, 'y');
+    .replace(/[ūŭúù]/g, 'u');
 
-  const uniq = (arr) => {
+  const PMAP = { m: [1,'Sg'], s:[2,'Sg'], t:[3,'Sg'], mus:[1,'Pl'], tis:[2,'Pl'], nt:[3,'Pl'] };
+
+  // Unregelmäßige Verben (häufige Formen)
+  const IRREG = {
+    'sum':   { lemma:'esse', tempus:'Präsens', p:1,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'es':    { lemma:'esse', tempus:'Präsens', p:2,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'est':   { lemma:'esse', tempus:'Präsens', p:3,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'sumus': { lemma:'esse', tempus:'Präsens', p:1,n:'Pl', modus:'Indikativ', voice:'Aktiv' },
+    'estis': { lemma:'esse', tempus:'Präsens', p:2,n:'Pl', modus:'Indikativ', voice:'Aktiv' },
+    'sunt':  { lemma:'esse', tempus:'Präsens', p:3,n:'Pl', modus:'Indikativ', voice:'Aktiv' },
+    'eram':  { lemma:'esse', tempus:'Imperfekt', p:1,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'eras':  { lemma:'esse', tempus:'Imperfekt', p:2,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'erat':  { lemma:'esse', tempus:'Imperfekt', p:3,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'eramus':{ lemma:'esse', tempus:'Imperfekt', p:1,n:'Pl', modus:'Indikativ', voice:'Aktiv' },
+    'eratis':{ lemma:'esse', tempus:'Imperfekt', p:2,n:'Pl', modus:'Indikativ', voice:'Aktiv' },
+    'erant': { lemma:'esse', tempus:'Imperfekt', p:3,n:'Pl', modus:'Indikativ', voice:'Aktiv' },
+    'sim':   { lemma:'esse', tempus:'Präsens', p:1,n:'Sg', modus:'Konjunktiv', voice:'Aktiv' },
+    'sit':   { lemma:'esse', tempus:'Präsens', p:3,n:'Sg', modus:'Konjunktiv', voice:'Aktiv' },
+    'essem': { lemma:'esse', tempus:'Imperfekt', p:1,n:'Sg', modus:'Konjunktiv', voice:'Aktiv' },
+    'esset': { lemma:'esse', tempus:'Imperfekt', p:3,n:'Sg', modus:'Konjunktiv', voice:'Aktiv' },
+    'fui':   { lemma:'esse', tempus:'Perfekt', p:1,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'fuit':  { lemma:'esse', tempus:'Perfekt', p:3,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'possum':{ lemma:'posse', tempus:'Präsens', p:1,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'potest':{ lemma:'posse', tempus:'Präsens', p:3,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'potui': { lemma:'posse', tempus:'Perfekt', p:1,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'eo':    { lemma:'ire', tempus:'Präsens', p:1,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'it':    { lemma:'ire', tempus:'Präsens', p:3,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'volo':  { lemma:'velle', tempus:'Präsens', p:1,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'vult':  { lemma:'velle', tempus:'Präsens', p:3,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'fero':  { lemma:'ferre', tempus:'Präsens', p:1,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'fert':  { lemma:'ferre', tempus:'Präsens', p:3,n:'Sg', modus:'Indikativ', voice:'Aktiv' },
+    'tuli':  { lemma:'ferre', tempus:'Perfekt', p:1,n:'Sg', modus:'Indikativ', voice:'Aktiv' }
+  };
+
+  function fmtVerb(a) {
+    const parts = ['Verb'];
+    if (a.tempus) parts.push(a.tempus);
+    if (a.modus) parts.push(a.modus);
+    if (a.voice) parts.push(a.voice);
+    if (a.p && a.n) parts.push(a.p + '. Pers. ' + (a.n === 'Sg' ? 'Singular' : 'Plural'));
+    return parts.join(' · ');
+  }
+  function fmtNomen(a) {
+    const cases = { Nom:'Nominativ', Gen:'Genitiv', Dat:'Dativ', Akk:'Akkusativ', Abl:'Ablativ', Vok:'Vokativ' };
+    const parts = ['Nomen / Adjektiv'];
+    if (a.case) parts.push(cases[a.case] || a.case);
+    if (a.n) parts.push(a.n === 'Sg' ? 'Singular' : 'Plural');
+    if (a.gender) parts.push(a.gender);
+    return parts.join(' · ');
+  }
+
+  // ---------- Verb-Analyse ----------
+  function analyzeVerb(f) {
+    const out = [];
+
+    // Imperfekt Indikativ Aktiv (-bam, -bas, ...)
+    let m = f.match(/^(.+?)ba(m|s|t|mus|tis|nt)$/);
+    if (m) {
+      const [p, n] = PMAP[m[2]];
+      out.push({ kind:'verb', tempus:'Imperfekt', modus:'Indikativ', voice:'Aktiv', p, n });
+    }
+    // Imperfekt Indikativ Passiv (-bar, -baris, -batur, -bamur, -bamini, -bantur)
+    m = f.match(/^(.+?)ba(r|ris|tur|mur|mini|ntur)$/);
+    if (m) {
+      const map = { r:[1,'Sg'], ris:[2,'Sg'], tur:[3,'Sg'], mur:[1,'Pl'], mini:[2,'Pl'], ntur:[3,'Pl'] };
+      const [p, n] = map[m[2]];
+      out.push({ kind:'verb', tempus:'Imperfekt', modus:'Indikativ', voice:'Passiv', p, n });
+    }
+    // Plusquamperfekt Indikativ (-eram)
+    m = f.match(/^(.+?)era(m|s|t|mus|tis|nt)$/);
+    if (m && f !== 'eram' && f !== 'eras' && f !== 'erat' && f !== 'eramus' && f !== 'eratis' && f !== 'erant') {
+      const [p, n] = PMAP[m[2]];
+      out.push({ kind:'verb', tempus:'Plusquamperfekt', modus:'Indikativ', voice:'Aktiv', p, n });
+    }
+    // Plusquamperfekt Konjunktiv / Präsens Konjunktiv von esse
+    m = f.match(/^(.+?)isse(m|s|t|mus|tis|nt)$/);
+    if (m) {
+      const [p, n] = PMAP[m[2]];
+      out.push({ kind:'verb', tempus:'Plusquamperfekt', modus:'Konjunktiv', voice:'Aktiv', p, n });
+    }
+    // Imperfekt Konjunktiv (Infinitiv + Endung)
+    m = f.match(/^(.+?)re(m|s|t|mus|tis|nt)$/);
+    if (m) {
+      const [p, n] = PMAP[m[2]];
+      out.push({ kind:'verb', tempus:'Imperfekt', modus:'Konjunktiv', voice:'Aktiv', p, n });
+    }
+    // Futur I (1./2. Konj): -bo/-bis/-bit/-bimus/-bitis/-bunt
+    m = f.match(/^(.+?)b(o|is|it|imus|itis|unt)$/);
+    if (m) {
+      const map = { o:[1,'Sg'], is:[2,'Sg'], it:[3,'Sg'], imus:[1,'Pl'], itis:[2,'Pl'], unt:[3,'Pl'] };
+      const [p, n] = map[m[2]];
+      out.push({ kind:'verb', tempus:'Futur I', modus:'Indikativ', voice:'Aktiv', p, n });
+    }
+    // Perfekt Indikativ Aktiv: -i, -isti, -it, -imus, -istis, -erunt/-ere
+    const perfEnds = [
+      ['isti',2,'Sg'], ['istis',2,'Pl'], ['erunt',3,'Pl']
+    ];
+    for (const [end, p, n] of perfEnds) {
+      if (f.endsWith(end) && f.length > end.length + 1) {
+        out.push({ kind:'verb', tempus:'Perfekt', modus:'Indikativ', voice:'Aktiv', p, n });
+      }
+    }
+    // Infinitiv Präsens Aktiv
+    if (/^(.+)(are|ere|ire)$/.test(f) && f.length >= 4) {
+      out.push({ kind:'verb', tempus:'Präsens', modus:'Infinitiv', voice:'Aktiv' });
+    }
+    // Infinitiv Präsens Passiv (-ari, -eri, -iri)
+    if (/^(.+)(ari|eri|iri)$/.test(f) && f.length >= 4) {
+      out.push({ kind:'verb', tempus:'Präsens', modus:'Infinitiv', voice:'Passiv' });
+    }
+
+    return out;
+  }
+
+  // ---------- Nomen-Analyse (vereinfacht, mit Genus-Hinweis) ----------
+  // Nur sehr eindeutige Endungen, um False-Positives zu reduzieren.
+  const NOM_RULES = [
+    // a-Dekl. (meist femininum)
+    { end:'arum', cases:[['Gen','Pl','f.']] },
+    { end:'abus', cases:[['Dat','Pl','f.'],['Abl','Pl','f.']] },
+    { end:'ae',   cases:[['Gen','Sg','f.'],['Dat','Sg','f.'],['Nom','Pl','f.']] },
+    { end:'am',   cases:[['Akk','Sg','f.']] },
+    // o-Dekl. (m./n.)
+    { end:'orum', cases:[['Gen','Pl','m./n.']] },
+    { end:'us',   cases:[['Nom','Sg','m.']] },
+    { end:'um',   cases:[['Akk','Sg','m.'],['Nom','Sg','n.'],['Akk','Sg','n.'],['Gen','Pl','—']] },
+    { end:'os',   cases:[['Akk','Pl','m.']] },
+    // 3. Dekl.
+    { end:'ibus', cases:[['Dat','Pl','—'],['Abl','Pl','—']] },
+    { end:'ium',  cases:[['Gen','Pl','—']] },
+    { end:'em',   cases:[['Akk','Sg','m./f.']] },
+    { end:'es',   cases:[['Nom','Pl','—'],['Akk','Pl','—']] },
+    // mehrdeutige Kurzendungen
+    { end:'is',   cases:[['Gen','Sg','—'],['Dat','Pl','—'],['Abl','Pl','—']] },
+    { end:'i',    cases:[['Gen','Sg','m./n.'],['Nom','Pl','m.']] },
+    { end:'o',    cases:[['Dat','Sg','m./n.'],['Abl','Sg','m./n.']] },
+    { end:'a',    cases:[['Nom','Sg','f.'],['Abl','Sg','f.'],['Nom','Pl','n.']] }
+  ];
+
+  function analyzeNoun(f) {
+    const out = [];
+    const sorted = NOM_RULES.slice().sort((a, b) => b.end.length - a.end.length);
+    let matched = false;
+    for (const r of sorted) {
+      if (f.endsWith(r.end) && f.length > r.end.length) {
+        for (const [c, n, g] of r.cases) {
+          out.push({ kind:'noun', case:c, n, gender:g });
+        }
+        matched = true;
+        // Stoppen nach längstem Treffer, um Mehrfachausgabe zu reduzieren
+        if (r.end.length >= 2) break;
+      }
+    }
+    return out;
+  }
+
+  function uniq(arr) {
     const seen = new Set(); const out = [];
     for (const a of arr) {
       const k = JSON.stringify(a);
       if (!seen.has(k)) { seen.add(k); out.push(a); }
     }
     return out;
-  };
-
-  // ---------- Endungstabellen ----------
-  const PERS_ACTIVE = [
-    { end: 'o',   p: 1, n: 'Sg' }, { end: 'm',   p: 1, n: 'Sg' },
-    { end: 's',   p: 2, n: 'Sg' }, { end: 't',   p: 3, n: 'Sg' },
-    { end: 'mus', p: 1, n: 'Pl' }, { end: 'tis', p: 2, n: 'Pl' },
-    { end: 'nt',  p: 3, n: 'Pl' }
-  ];
-  const PERS_PASSIVE = [
-    { end: 'r',    p: 1, n: 'Sg' }, { end: 'ris', p: 2, n: 'Sg' },
-    { end: 'tur',  p: 3, n: 'Sg' }, { end: 'mur', p: 1, n: 'Pl' },
-    { end: 'mini', p: 2, n: 'Pl' }, { end: 'ntur', p: 3, n: 'Pl' }
-  ];
-
-  // Perfekt Aktiv Endungen
-  const PERF_ACT = [
-    { end: 'i',     p: 1, n: 'Sg' },
-    { end: 'isti',  p: 2, n: 'Sg' },
-    { end: 'it',    p: 3, n: 'Sg' },
-    { end: 'imus',  p: 1, n: 'Pl' },
-    { end: 'istis', p: 2, n: 'Pl' },
-    { end: 'erunt', p: 3, n: 'Pl' },
-    { end: 'ere',   p: 3, n: 'Pl' }
-  ];
-
-  // ---------- Unregelmäßige Verben ----------
-  // Mapping: Form (normalisiert) -> Array von Analysen
-  const IRREG = {
-    // esse
-    'sum':   [{ lemma: 'esse', trans: 'sein', tempus: 'Präsens',   modus: 'Ind', voice: 'Akt', p: 1, n: 'Sg' }],
-    'es':    [{ lemma: 'esse', trans: 'sein', tempus: 'Präsens',   modus: 'Ind', voice: 'Akt', p: 2, n: 'Sg' }],
-    'est':   [{ lemma: 'esse', trans: 'sein', tempus: 'Präsens',   modus: 'Ind', voice: 'Akt', p: 3, n: 'Sg' }],
-    'sumus': [{ lemma: 'esse', trans: 'sein', tempus: 'Präsens',   modus: 'Ind', voice: 'Akt', p: 1, n: 'Pl' }],
-    'estis': [{ lemma: 'esse', trans: 'sein', tempus: 'Präsens',   modus: 'Ind', voice: 'Akt', p: 2, n: 'Pl' }],
-    'sunt':  [{ lemma: 'esse', trans: 'sein', tempus: 'Präsens',   modus: 'Ind', voice: 'Akt', p: 3, n: 'Pl' }],
-    'eram':  [{ lemma: 'esse', trans: 'sein', tempus: 'Imperfekt', modus: 'Ind', voice: 'Akt', p: 1, n: 'Sg' }],
-    'eras':  [{ lemma: 'esse', trans: 'sein', tempus: 'Imperfekt', modus: 'Ind', voice: 'Akt', p: 2, n: 'Sg' }],
-    'erat':  [{ lemma: 'esse', trans: 'sein', tempus: 'Imperfekt', modus: 'Ind', voice: 'Akt', p: 3, n: 'Sg' }],
-    'eramus':[{ lemma: 'esse', trans: 'sein', tempus: 'Imperfekt', modus: 'Ind', voice: 'Akt', p: 1, n: 'Pl' }],
-    'eratis':[{ lemma: 'esse', trans: 'sein', tempus: 'Imperfekt', modus: 'Ind', voice: 'Akt', p: 2, n: 'Pl' }],
-    'erant': [{ lemma: 'esse', trans: 'sein', tempus: 'Imperfekt', modus: 'Ind', voice: 'Akt', p: 3, n: 'Pl' }],
-    'ero':   [{ lemma: 'esse', trans: 'sein', tempus: 'Futur I',   modus: 'Ind', voice: 'Akt', p: 1, n: 'Sg' }],
-    'eris':  [{ lemma: 'esse', trans: 'sein', tempus: 'Futur I',   modus: 'Ind', voice: 'Akt', p: 2, n: 'Sg' }],
-    'erit':  [{ lemma: 'esse', trans: 'sein', tempus: 'Futur I',   modus: 'Ind', voice: 'Akt', p: 3, n: 'Sg' }],
-    'erimus':[{ lemma: 'esse', trans: 'sein', tempus: 'Futur I',   modus: 'Ind', voice: 'Akt', p: 1, n: 'Pl' }],
-    'eritis':[{ lemma: 'esse', trans: 'sein', tempus: 'Futur I',   modus: 'Ind', voice: 'Akt', p: 2, n: 'Pl' }],
-    'erunt': [{ lemma: 'esse', trans: 'sein', tempus: 'Futur I',   modus: 'Ind', voice: 'Akt', p: 3, n: 'Pl' }],
-    'sim':   [{ lemma: 'esse', trans: 'sein', tempus: 'Präsens',   modus: 'Konj', voice: 'Akt', p: 1, n: 'Sg' }],
-    'sis':   [{ lemma: 'esse', trans: 'sein', tempus: 'Präsens',   modus: 'Konj', voice: 'Akt', p: 2, n: 'Sg' }],
-    'sit':   [{ lemma: 'esse', trans: 'sein', tempus: 'Präsens',   modus: 'Konj', voice: 'Akt', p: 3, n: 'Sg' }],
-    'simus': [{ lemma: 'esse', trans: 'sein', tempus: 'Präsens',   modus: 'Konj', voice: 'Akt', p: 1, n: 'Pl' }],
-    'sitis': [{ lemma: 'esse', trans: 'sein', tempus: 'Präsens',   modus: 'Konj', voice: 'Akt', p: 2, n: 'Pl' }],
-    'sint':  [{ lemma: 'esse', trans: 'sein', tempus: 'Präsens',   modus: 'Konj', voice: 'Akt', p: 3, n: 'Pl' }],
-    'essem': [{ lemma: 'esse', trans: 'sein', tempus: 'Imperfekt', modus: 'Konj', voice: 'Akt', p: 1, n: 'Sg' }],
-    'esses': [{ lemma: 'esse', trans: 'sein', tempus: 'Imperfekt', modus: 'Konj', voice: 'Akt', p: 2, n: 'Sg' }],
-    'esset': [{ lemma: 'esse', trans: 'sein', tempus: 'Imperfekt', modus: 'Konj', voice: 'Akt', p: 3, n: 'Sg' }],
-    'essemus':[{ lemma: 'esse', trans: 'sein', tempus: 'Imperfekt', modus: 'Konj', voice: 'Akt', p: 1, n: 'Pl' }],
-    'essetis':[{ lemma: 'esse', trans: 'sein', tempus: 'Imperfekt', modus: 'Konj', voice: 'Akt', p: 2, n: 'Pl' }],
-    'essent':[{ lemma: 'esse', trans: 'sein', tempus: 'Imperfekt', modus: 'Konj', voice: 'Akt', p: 3, n: 'Pl' }],
-    'fui':   [{ lemma: 'esse', trans: 'sein', tempus: 'Perfekt',   modus: 'Ind', voice: 'Akt', p: 1, n: 'Sg' }],
-    'fuisti':[{ lemma: 'esse', trans: 'sein', tempus: 'Perfekt',   modus: 'Ind', voice: 'Akt', p: 2, n: 'Sg' }],
-    'fuit':  [{ lemma: 'esse', trans: 'sein', tempus: 'Perfekt',   modus: 'Ind', voice: 'Akt', p: 3, n: 'Sg' }],
-    'fuimus':[{ lemma: 'esse', trans: 'sein', tempus: 'Perfekt',   modus: 'Ind', voice: 'Akt', p: 1, n: 'Pl' }],
-    'fuistis':[{ lemma: 'esse', trans: 'sein', tempus: 'Perfekt',  modus: 'Ind', voice: 'Akt', p: 2, n: 'Pl' }],
-    'fuerunt':[{ lemma: 'esse', trans: 'sein', tempus: 'Perfekt',  modus: 'Ind', voice: 'Akt', p: 3, n: 'Pl' }],
-    // posse
-    'possum':  [{ lemma: 'posse', trans: 'können', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 1, n: 'Sg' }],
-    'potes':   [{ lemma: 'posse', trans: 'können', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 2, n: 'Sg' }],
-    'potest':  [{ lemma: 'posse', trans: 'können', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 3, n: 'Sg' }],
-    'possumus':[{ lemma: 'posse', trans: 'können', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 1, n: 'Pl' }],
-    'potestis':[{ lemma: 'posse', trans: 'können', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 2, n: 'Pl' }],
-    'possunt': [{ lemma: 'posse', trans: 'können', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 3, n: 'Pl' }],
-    'poteram': [{ lemma: 'posse', trans: 'können', tempus: 'Imperfekt', modus: 'Ind', voice: 'Akt', p: 1, n: 'Sg' }],
-    'poteras': [{ lemma: 'posse', trans: 'können', tempus: 'Imperfekt', modus: 'Ind', voice: 'Akt', p: 2, n: 'Sg' }],
-    'poterat': [{ lemma: 'posse', trans: 'können', tempus: 'Imperfekt', modus: 'Ind', voice: 'Akt', p: 3, n: 'Sg' }],
-    'potui':   [{ lemma: 'posse', trans: 'können', tempus: 'Perfekt', modus: 'Ind', voice: 'Akt', p: 1, n: 'Sg' }],
-    'potuit':  [{ lemma: 'posse', trans: 'können', tempus: 'Perfekt', modus: 'Ind', voice: 'Akt', p: 3, n: 'Sg' }],
-    // ferre
-    'fero':   [{ lemma: 'ferre', trans: 'tragen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 1, n: 'Sg' }],
-    'fers':   [{ lemma: 'ferre', trans: 'tragen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 2, n: 'Sg' }],
-    'fert':   [{ lemma: 'ferre', trans: 'tragen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 3, n: 'Sg' }],
-    'ferimus':[{ lemma: 'ferre', trans: 'tragen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 1, n: 'Pl' }],
-    'fertis': [{ lemma: 'ferre', trans: 'tragen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 2, n: 'Pl' }],
-    'ferunt': [{ lemma: 'ferre', trans: 'tragen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 3, n: 'Pl' }],
-    'tuli':   [{ lemma: 'ferre', trans: 'tragen', tempus: 'Perfekt', modus: 'Ind', voice: 'Akt', p: 1, n: 'Sg' }],
-    'tulit':  [{ lemma: 'ferre', trans: 'tragen', tempus: 'Perfekt', modus: 'Ind', voice: 'Akt', p: 3, n: 'Sg' }],
-    // ire
-    'eo':   [{ lemma: 'ire', trans: 'gehen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 1, n: 'Sg' }],
-    'is':   [{ lemma: 'ire', trans: 'gehen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 2, n: 'Sg' }],
-    'it':   [{ lemma: 'ire', trans: 'gehen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 3, n: 'Sg' }],
-    'imus': [{ lemma: 'ire', trans: 'gehen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 1, n: 'Pl' }],
-    'itis': [{ lemma: 'ire', trans: 'gehen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 2, n: 'Pl' }],
-    'eunt': [{ lemma: 'ire', trans: 'gehen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 3, n: 'Pl' }],
-    // velle
-    'volo':    [{ lemma: 'velle', trans: 'wollen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 1, n: 'Sg' }],
-    'vis':     [{ lemma: 'velle', trans: 'wollen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 2, n: 'Sg' }],
-    'vult':    [{ lemma: 'velle', trans: 'wollen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 3, n: 'Sg' }],
-    'volumus': [{ lemma: 'velle', trans: 'wollen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 1, n: 'Pl' }],
-    'vultis':  [{ lemma: 'velle', trans: 'wollen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 2, n: 'Pl' }],
-    'volunt':  [{ lemma: 'velle', trans: 'wollen', tempus: 'Präsens', modus: 'Ind', voice: 'Akt', p: 3, n: 'Pl' }]
-  };
-
-  // ---------- Formatierung ----------
-  function fmtVerb(a) {
-    const parts = [];
-    parts.push('Verb');
-    if (a.tempus) parts.push(a.tempus);
-    if (a.modus) parts.push(a.modus === 'Konj' ? 'Konjunktiv' : (a.modus === 'Ind' ? 'Indikativ' : a.modus));
-    if (a.voice) parts.push(a.voice === 'Akt' ? 'Aktiv' : 'Passiv');
-    if (a.p && a.n) parts.push(a.p + '. Pers. ' + a.n);
-    return parts.join(' · ');
   }
 
-  function fmtNomen(a) {
-    const cases = { Nom: 'Nominativ', Gen: 'Genitiv', Dat: 'Dativ', Akk: 'Akkusativ', Abl: 'Ablativ', Vok: 'Vokativ' };
-    const parts = ['Nomen/Adj'];
-    if (a.case) parts.push(cases[a.case] || a.case);
-    if (a.n) parts.push(a.n);
-    if (a.decl) parts.push(a.decl + '. Dekl.');
-    return parts.join(' · ');
-  }
-
-  // ---------- Verb-Analyse (regelbasiert) ----------
-  function analyzeVerbRules(form) {
-    const f = norm(form);
-    const out = [];
-
-    // Imperativ Präsens
-    // -a / -e / -i (Sg), -ate / -ete / -ite (Pl)
-    if (/[aei]$/.test(f) && f.length >= 2 && !/ae$/.test(f)) {
-      const stem = f.slice(0, -1);
-      out.push({ kind: 'verb', stem, tempus: 'Präsens', modus: 'Imp', voice: 'Akt', p: 2, n: 'Sg',
-        infinitiveGuess: stem + 're' });
-    }
-    if (/(ate|ete|ite)$/.test(f)) {
-      const stem = f.slice(0, -2);
-      out.push({ kind: 'verb', stem, tempus: 'Präsens', modus: 'Imp', voice: 'Akt', p: 2, n: 'Pl',
-        infinitiveGuess: stem + 're' });
-    }
-
-    // Perfekt Aktiv (Indikativ)
-    for (const pe of PERF_ACT) {
-      if (f.endsWith(pe.end) && f.length > pe.end.length) {
-        const perfStem = f.slice(0, -pe.end.length);
-        out.push({ kind: 'verb', perfStem, tempus: 'Perfekt', modus: 'Ind', voice: 'Akt',
-          p: pe.p, n: pe.n });
-      }
-    }
-
-    // Plusquamperfekt Indikativ -era-
-    // Konj Plusquamperfekt -isse-
-    // Konj Perfekt -eri-
-    // Futur II -eri- / -er-
-    const pqpMatch = f.match(/^(.+?)(era|eri|isse)(m|s|t|mus|tis|nt)$/);
-    if (pqpMatch) {
-      const [, stem, tmark, pend] = pqpMatch;
-      const pmap = { m: [1,'Sg'], s:[2,'Sg'], t:[3,'Sg'], mus:[1,'Pl'], tis:[2,'Pl'], nt:[3,'Pl'] };
-      const [p, n] = pmap[pend];
-      if (tmark === 'era') {
-        out.push({ kind: 'verb', perfStem: stem, tempus: 'Plusquamperfekt', modus: 'Ind', voice: 'Akt', p, n });
-      } else if (tmark === 'isse') {
-        out.push({ kind: 'verb', perfStem: stem, tempus: 'Plusquamperfekt', modus: 'Konj', voice: 'Akt', p, n });
-      } else if (tmark === 'eri') {
-        // mehrdeutig
-        out.push({ kind: 'verb', perfStem: stem, tempus: 'Futur II', modus: 'Ind', voice: 'Akt', p, n });
-        out.push({ kind: 'verb', perfStem: stem, tempus: 'Perfekt', modus: 'Konj', voice: 'Akt', p, n });
-      }
-    }
-
-    // Imperfekt Indikativ Aktiv: -ba- + Endung
-    const impfA = f.match(/^(.+?)(ba)(m|s|t|mus|tis|nt)$/);
-    if (impfA) {
-      const [, stem, , pend] = impfA;
-      const pmap = { m: [1,'Sg'], s:[2,'Sg'], t:[3,'Sg'], mus:[1,'Pl'], tis:[2,'Pl'], nt:[3,'Pl'] };
-      const [p, n] = pmap[pend];
-      out.push({ kind: 'verb', presStem: stem, tempus: 'Imperfekt', modus: 'Ind', voice: 'Akt', p, n,
-        infinitiveGuess: stem + 're' });
-    }
-    // Imperfekt Passiv: -ba- + Passivendung
-    const impfP = f.match(/^(.+?)(ba)(r|ris|tur|mur|mini|ntur)$/);
-    if (impfP) {
-      const [, stem, , pend] = impfP;
-      const pp = PERS_PASSIVE.find(x => x.end === pend);
-      if (pp) out.push({ kind: 'verb', presStem: stem, tempus: 'Imperfekt', modus: 'Ind', voice: 'Pas',
-        p: pp.p, n: pp.n, infinitiveGuess: stem + 'ri' });
-    }
-
-    // Imperfekt Konjunktiv: Infinitiv + Endung (amarem, viderem, caperem, audirem)
-    const konjImpf = f.match(/^(.+?re)(m|s|t|mus|tis|nt)$/);
-    if (konjImpf) {
-      const [, inf, pend] = konjImpf;
-      const pmap = { m: [1,'Sg'], s:[2,'Sg'], t:[3,'Sg'], mus:[1,'Pl'], tis:[2,'Pl'], nt:[3,'Pl'] };
-      const [p, n] = pmap[pend];
-      out.push({ kind: 'verb', infinitiveGuess: inf, tempus: 'Imperfekt', modus: 'Konj', voice: 'Akt', p, n });
-    }
-
-    // Futur I: 1./2. Konjug.: -bo, -bis, -bit, -bimus, -bitis, -bunt
-    const futB = f.match(/^(.+?)b(o|is|it|imus|itis|unt)$/);
-    if (futB) {
-      const [, stem, suf] = futB;
-      const pmap = { o:[1,'Sg'], is:[2,'Sg'], it:[3,'Sg'], imus:[1,'Pl'], itis:[2,'Pl'], unt:[3,'Pl'] };
-      const [p, n] = pmap[suf];
-      out.push({ kind: 'verb', presStem: stem, tempus: 'Futur I', modus: 'Ind', voice: 'Akt', p, n,
-        infinitiveGuess: stem + 're' });
-    }
-
-    // Präsens Konjunktiv (a→e, e→ea, i→ia) — heuristisch über Endungen -em/-eam/-iam
-    const konjPres = f.match(/^(.+?)(e|ea|ia)(m|s|t|mus|tis|nt)$/);
-    if (konjPres) {
-      const [, stem, vowel, pend] = konjPres;
-      const pmap = { m: [1,'Sg'], s:[2,'Sg'], t:[3,'Sg'], mus:[1,'Pl'], tis:[2,'Pl'], nt:[3,'Pl'] };
-      const [p, n] = pmap[pend];
-      let guessed;
-      if (vowel === 'e') guessed = stem + 'are';   // a-Konj
-      else if (vowel === 'ea') guessed = stem + 'ere'; // e-Konj
-      else guessed = stem + 'ere'; // i-/gem.
-      out.push({ kind: 'verb', presStem: stem, tempus: 'Präsens', modus: 'Konj', voice: 'Akt', p, n,
-        infinitiveGuess: guessed });
-    }
-
-    // Präsens Indikativ Aktiv
-    for (const pe of PERS_ACTIVE) {
-      if (f.endsWith(pe.end) && f.length > pe.end.length + 1) {
-        const stem = f.slice(0, -pe.end.length);
-        // Basisform-Vermutung je nach Endvokal
-        let inf;
-        if (/a$/.test(stem)) inf = stem + 're';
-        else if (/e$/.test(stem)) inf = stem + 're';
-        else if (/i$/.test(stem)) inf = stem + 're';
-        else inf = stem + 'ere';
-        out.push({ kind: 'verb', presStem: stem, tempus: 'Präsens', modus: 'Ind', voice: 'Akt',
-          p: pe.p, n: pe.n, infinitiveGuess: inf });
-      }
-    }
-    // Präsens Indikativ Passiv
-    for (const pe of PERS_PASSIVE) {
-      if (f.endsWith(pe.end) && f.length > pe.end.length + 1) {
-        const stem = f.slice(0, -pe.end.length);
-        out.push({ kind: 'verb', presStem: stem, tempus: 'Präsens', modus: 'Ind', voice: 'Pas',
-          p: pe.p, n: pe.n, infinitiveGuess: stem + 'ri' });
-      }
-    }
-
-    // Infinitiv Präsens Aktiv (-are, -ere, -ire)
-    if (/(are|ere|ire)$/.test(f)) {
-      out.push({ kind: 'verb', tempus: 'Präsens', modus: 'Inf', voice: 'Akt', infinitiveGuess: f });
-    }
-    // Infinitiv Präsens Passiv (-ari, -eri, -iri)
-    if (/(ari|eri|iri)$/.test(f)) {
-      out.push({ kind: 'verb', tempus: 'Präsens', modus: 'Inf', voice: 'Pas',
-        infinitiveGuess: f.slice(0, -1) + 'e' });
-    }
-
-    // Partizipien
-    if (/ns$/.test(f)) {
-      out.push({ kind: 'participle', sub: 'PPA', infinitiveGuess: f.slice(0, -2) + 're' });
-    }
-    if (/(tus|ta|tum|ti|tae|ta)$/.test(f)) {
-      out.push({ kind: 'participle', sub: 'PPP' });
-    }
-
-    return out;
-  }
-
-  // ---------- Nomen-/Adjektiv-Analyse ----------
-  const NOM_ENDINGS = [
-    // a-Deklination
-    { end: 'a',   decl: 1, cases: [['Nom','Sg'], ['Abl','Sg'], ['Nom','Pl'], ['Vok','Sg']] },
-    { end: 'ae',  decl: 1, cases: [['Gen','Sg'], ['Dat','Sg'], ['Nom','Pl']] },
-    { end: 'am',  decl: 1, cases: [['Akk','Sg']] },
-    { end: 'as',  decl: 1, cases: [['Akk','Pl']] },
-    { end: 'arum',decl: 1, cases: [['Gen','Pl']] },
-    { end: 'is',  decl: 1, cases: [['Dat','Pl'], ['Abl','Pl']] },
-    // o-Deklination
-    { end: 'us',  decl: 2, cases: [['Nom','Sg']] },
-    { end: 'i',   decl: 2, cases: [['Gen','Sg'], ['Nom','Pl'], ['Vok','Pl']] },
-    { end: 'o',   decl: 2, cases: [['Dat','Sg'], ['Abl','Sg']] },
-    { end: 'um',  decl: 2, cases: [['Akk','Sg'], ['Nom','Sg (n)']] },
-    { end: 'os',  decl: 2, cases: [['Akk','Pl']] },
-    { end: 'orum',decl: 2, cases: [['Gen','Pl']] },
-    // 3. Dekl.
-    { end: 'is',  decl: 3, cases: [['Gen','Sg']] },
-    { end: 'em',  decl: 3, cases: [['Akk','Sg']] },
-    { end: 'e',   decl: 3, cases: [['Abl','Sg']] },
-    { end: 'es',  decl: 3, cases: [['Nom','Pl'], ['Akk','Pl']] },
-    { end: 'um',  decl: 3, cases: [['Gen','Pl']] },
-    { end: 'ium', decl: 3, cases: [['Gen','Pl (i-St.)']] },
-    { end: 'ibus',decl: 3, cases: [['Dat','Pl'], ['Abl','Pl']] }
-  ];
-
-  function analyzeNounRules(form) {
-    const f = norm(form);
-    const out = [];
-    // längste Endung zuerst
-    const sorted = NOM_ENDINGS.slice().sort((a, b) => b.end.length - a.end.length);
-    const seenStems = new Map();
-    for (const ne of sorted) {
-      if (f.endsWith(ne.end) && f.length > ne.end.length) {
-        const stem = f.slice(0, -ne.end.length);
-        for (const [c, n] of ne.cases) {
-          out.push({ kind: 'noun', stem, decl: ne.decl, case: c, n });
-        }
-        seenStems.set(stem, true);
-      }
-    }
-    return out;
-  }
-
-  // ---------- Lemma-Matching aus Vokabelliste ----------
-  // vocabList: Array von { latin_word, forms, german_translation, lesson_number, book? }
-  function matchLemmas(analyses, vocabList) {
-    const matches = [];
-    for (const v of vocabList) {
-      const lemma = norm(v.latin_word);
-      const lemmaBase = lemma.replace(/[,;\s].*$/, '').trim();
-      // "amare" → Stamm "ama"
-      for (const a of analyses) {
-        let hit = false;
-        if (a.kind === 'verb') {
-          if (a.infinitiveGuess && a.infinitiveGuess === lemmaBase) hit = true;
-          if (a.presStem && lemmaBase.startsWith(a.presStem) && lemmaBase.length - a.presStem.length <= 3) hit = true;
-          if (a.perfStem && lemma.includes(a.perfStem) && a.perfStem.length >= 3) hit = true;
-          if (a.lemma && a.lemma === lemmaBase) hit = true;
-        } else if (a.kind === 'noun' || a.kind === 'participle') {
-          if (a.stem && lemmaBase.startsWith(a.stem) && a.stem.length >= 2) hit = true;
-        }
-        // Direktmatch
-        if (lemmaBase === norm(a.form || '')) hit = true;
-        if (hit) matches.push({ vocab: v, analysis: a });
-      }
-      // exakter Lemma-Treffer
-      if (lemmaBase === norm(window.__CURRENT_QUERY__ || '')) {
-        matches.push({ vocab: v, analysis: { kind: 'lemma', note: 'Grundform' } });
-      }
-    }
-    // duplikate entfernen (pro vocab+label)
-    const seen = new Set(); const uniqM = [];
-    for (const m of matches) {
-      const k = m.vocab.latin_word + '|' + (m.analysis.kind === 'verb' ? fmtVerb(m.analysis) : (m.analysis.kind === 'noun' ? fmtNomen(m.analysis) : (m.analysis.note || m.analysis.kind)));
-      if (!seen.has(k)) { seen.add(k); uniqM.push(m); }
-    }
-    return uniqM;
-  }
-
-  // ---------- Hauptfunktion ----------
   function analyze(form) {
     const f = norm(form);
-    if (!f) return { analyses: [] };
+    if (!f) return { form:'', analyses:[] };
     const analyses = [];
-
-    // 1. Unregelmäßige Verben
-    if (IRREG[f]) {
-      IRREG[f].forEach(a => analyses.push(Object.assign({ kind: 'verb' }, a)));
-    }
-
-    // 2. Regelbasiert Verben
-    analyses.push(...analyzeVerbRules(f));
-    // 3. Nomen/Adjektive
-    analyses.push(...analyzeNounRules(f));
-
-    return { form: f, analyses: uniq(analyses) };
+    if (IRREG[f]) analyses.push(Object.assign({ kind:'verb' }, IRREG[f]));
+    analyses.push(...analyzeVerb(f));
+    analyses.push(...analyzeNoun(f));
+    return { form:f, analyses: uniq(analyses) };
   }
 
   function formatAnalysis(a) {
     if (a.kind === 'verb') return fmtVerb(a);
     if (a.kind === 'noun') return fmtNomen(a);
-    if (a.kind === 'participle') return a.sub === 'PPA' ? 'Partizip Präsens Aktiv' : 'Partizip Perfekt Passiv';
-    if (a.kind === 'lemma') return 'Grundform';
     return a.kind;
   }
 
-  global.LatinAnalyzer = { analyze, matchLemmas, formatAnalysis, norm };
+  // Lemma-Suche: Schüler-Modus = exakte Grundformsuche (substring match auf latin_word)
+  function searchLemma(query, vocabList) {
+    const q = norm(query);
+    if (!q) return [];
+    const out = [];
+    for (const v of vocabList) {
+      const head = norm(v.latin_word).split(/[,;\s]/)[0];
+      const full = norm(v.latin_word);
+      if (head === q || full.includes(q)) {
+        out.push(v);
+      }
+    }
+    return out;
+  }
+
+  global.LatinAnalyzer = { analyze, formatAnalysis, searchLemma, norm };
 })(window);

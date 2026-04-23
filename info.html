@@ -3,73 +3,103 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vokabeltrainer – Info</title>
+  <title>Vokabeltrainer – Hilfe & FAQ</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body data-page="info">
-  <div style="position: fixed; top: 1rem; right: 1rem; display:flex; gap:0.5rem; z-index:50;">
-    <button class="btn btn-ghost btn-small" onclick="history.back()">← Zurück</button>
-    <button class="btn btn-ghost icon-btn" id="theme-toggle" title="Hell/Dunkel"><span id="theme-icon">☾</span></button>
+<main>
+  <div class="page-header">
+    <h2>Hilfe & FAQ</h2>
+    <p>Antworten auf die häufigsten Fragen.</p>
   </div>
 
-  <div style="max-width: 760px; margin: 3rem auto; padding: 0 1rem;">
-    <div class="page-header" style="text-align:center;">
-      <h2>Info & Hilfe</h2>
-      <p>So funktioniert der Vokabeltrainer.</p>
+  <details class="faq-item" open>
+    <summary>Wie ändere ich meinen Namen?</summary>
+    <div class="faq-body">
+      <p>Gehe auf <a href="profil.html">Profil</a> → Sektion <em>Name ändern</em>. Trage dort Vor- und Nachnamen ein und klicke auf <strong>Speichern</strong>. Eventuell musst du die Seite einmal neu laden, damit der Name überall erscheint.</p>
     </div>
+  </details>
 
-    <section class="info-card">
-      <h3>So werden deine Antworten korrigiert</h3>
+  <details class="faq-item">
+    <summary>Wie ändere ich mein Passwort?</summary>
+    <div class="faq-body">
+      <p>Auf <a href="profil.html">Profil</a> → Sektion <em>Passwort ändern</em>. Du brauchst dein aktuelles Passwort. Das neue Passwort muss mindestens 4 Zeichen haben.</p>
+    </div>
+  </details>
+
+  <details class="faq-item">
+    <summary>Ich habe mein Passwort vergessen. Was tun?</summary>
+    <div class="faq-body">
+      <p>Frag deinen Lehrer. Lehrer können in ihrer Klasse für jeden Schüler ein neues, temporäres Passwort vergeben. Wenn du dann eingeloggt bist, kannst du es im Profil sofort wieder ändern.</p>
+    </div>
+  </details>
+
+  <details class="faq-item">
+    <summary>Wie melde ich mich aus?</summary>
+    <div class="faq-body">
+      <p>Klicke oben rechts in der Kopfzeile auf den <em>Abmelden</em>-Button (Pfeil mit Tür-Symbol).</p>
+    </div>
+  </details>
+
+  <details class="faq-item">
+    <summary>Wie werden meine Antworten korrigiert?</summary>
+    <div class="faq-body">
       <p>Bei jedem Test prüfen wir <strong>zwei Felder</strong>: die <em>Formen</em> (Latein) und die <em>Übersetzung</em> (Deutsch). Beide müssen stimmen, damit eine Vokabel als richtig zählt. Hat eine Vokabel keine Formen, wird nur die Übersetzung geprüft.</p>
-
       <h4>Übersetzung (Deutsch)</h4>
       <ul>
         <li>Groß-/Kleinschreibung egal.</li>
         <li>Artikel (<code>der, die, das, ein, eine, einer, eines, einem, einen</code>) werden ignoriert.</li>
-        <li>Sonderzeichen wie <code>( ) / &amp; % $ § " ! ?</code> werden ignoriert. Nur Buchstaben (auch ä, ö, ü, ß) und Leerzeichen zählen.</li>
-        <li>Stehen mehrere Übersetzungen in den Vokabeln (getrennt durch <code>,</code> oder <code>;</code>), reicht <strong>eine</strong> davon.</li>
-        <li>Beispiel: <code>tum = dann, da, darauf, damals</code> → akzeptiert: „dann", „Da", „darauf!", „und damals".</li>
+        <li>Sonderzeichen wie <code>( ) / &amp; % $ § " ! ?</code> werden ignoriert.</li>
+        <li>Stehen mehrere Übersetzungen in den Vokabeln (Trennung durch <code>,</code> oder <code>;</code>), reicht <strong>eine</strong> davon.</li>
       </ul>
-
       <h4>Formen (Latein)</h4>
       <ul>
         <li>Groß-/Kleinschreibung egal.</li>
         <li>Leerzeichen, Kommas und alle Sonderzeichen werden komplett entfernt.</li>
         <li>Die übrigen Buchstaben müssen <strong>exakt</strong> übereinstimmen.</li>
-        <li>Beispiel: <code>amo, amare, amavi, amatum</code> → richtig: „amoamareamaviamatum", „amo amare amavi amatum", „Amo, Amare, Amavi, Amatum".</li>
       </ul>
-    </section>
+    </div>
+  </details>
 
-    <section class="info-card">
-      <h3>Einsprüche</h3>
-      <p>Wenn du der Meinung bist, deine Antwort war doch richtig, kannst du in der Ergebnisansicht <strong>Einspruch</strong> einlegen. Der Lehrer entscheidet: <strong>Genehmigt</strong> = Vokabel zählt als richtig, Punkt wird nachgetragen. <strong>Abgelehnt</strong> = Bewertung bleibt.</p>
-    </section>
+  <details class="faq-item">
+    <summary>Wie funktioniert ein Einspruch?</summary>
+    <div class="faq-body">
+      <p>Wenn du nach einem Test der Meinung bist, dass deine Antwort doch richtig war, kannst du in der Ergebnisansicht auf <strong>Einspruch</strong> klicken. Dein Lehrer entscheidet: <strong>Genehmigt</strong> = die Vokabel zählt als richtig und der Punkt wird nachgetragen. <strong>Abgelehnt</strong> = die Bewertung bleibt.</p>
+    </div>
+  </details>
 
-    <section class="info-card">
-      <h3>Rollen</h3>
-      <ul>
-        <li><strong>Schüler</strong>: Üben mit Karteikarten, Probe-Tests schreiben, an echten Vokabeltests teilnehmen.</li>
-        <li><strong>Lehrer</strong>: Klassen anlegen, Schüler hinzufügen, Tests erstellen, Ergebnisse einsehen, Einsprüche bearbeiten. Für die Registrierung als Lehrer ist ein Code nötig.</li>
-      </ul>
-    </section>
+  <details class="faq-item">
+    <summary>Wie nehme ich an einem Test teil?</summary>
+    <div class="faq-body">
+      <p>Geh auf <a href="schueler.html">Übersicht</a> → Karte „An Test teilnehmen". Gib dort die 6-stellige Test-ID ein, die du von deinem Lehrer bekommst.</p>
+    </div>
+  </details>
 
-    <section class="info-card">
-      <h3>Formen-Check</h3>
-      <p>Auf der Seite <a href="analyse.html">Formen-Check</a> kannst du eine beliebige flektierte lateinische Form eingeben (z.B. <code>amarem</code>, <code>puellae</code>, <code>sumus</code>). Das System erkennt:</p>
-      <ul>
-        <li><strong>Verben</strong>: Person, Zahl, Zeit (Präsens, Imperfekt, Perfekt, Plusquamperfekt, Futur I/II), Modus (Indikativ, Konjunktiv, Imperativ, Infinitiv), Aktiv/Passiv.</li>
-        <li><strong>Nomen & Adjektive</strong>: Fall, Zahl, Deklination.</li>
-        <li><strong>Partizipien</strong>: PPP, PPA.</li>
-        <li><strong>Unregelmäßige Verben</strong>: <em>esse, posse, ferre, ire, velle</em> inkl. Perfektformen (<code>fui</code>, <code>tuli</code>…).</li>
-      </ul>
-      <p>Da Latein mehrdeutig ist, werden alle möglichen Bestimmungen angezeigt. Außerdem suchen wir in den Büchern nach passenden Wörtern.</p>
-    </section>
+  <details class="faq-item">
+    <summary>Wie funktioniert die Vokabelsuche?</summary>
+    <div class="faq-body">
+      <p>Auf <a href="analyse.html">Vokabelsuche</a> kannst du eine Grundform eingeben (z.B. <code>videre</code>) und die App zeigt dir alle passenden Einträge aus den Vokabelbüchern.</p>
+      <p><em>Lehrer-Hinweis:</em> Lehrer sehen zusätzlich die Lektionsnummer und den Tab <em>Formen-Check</em> (noch in Entwicklung), der flektierte Formen bestimmt.</p>
+    </div>
+  </details>
 
-    <section class="info-card">
-      <h3>Profil & Sicherheit</h3>
-      <p>Auf der <a href="profil.html">Profilseite</a> kannst du deinen Namen und dein Passwort ändern oder deinen Account löschen. Beim ersten Öffnen pro Sitzung prüfen wir, ob dein Account noch existiert – falls nicht, wirst du zur Anmeldung weitergeleitet.</p>
-    </section>
-  </div>
-  <script src="script.js"></script>
+  <details class="faq-item">
+    <summary>Wie lösche ich meinen Account?</summary>
+    <div class="faq-body">
+      <p>Auf <a href="profil.html">Profil</a> ganz unten → <strong>Account löschen</strong>. Achtung: Damit verschwinden auch alle deine Testergebnisse (bei Schülern) bzw. Klassen und Tests (bei Lehrern). Das kann nicht rückgängig gemacht werden.</p>
+    </div>
+  </details>
+
+  <details class="faq-item">
+    <summary>Du brauchst weitere Hilfe?</summary>
+    <div class="faq-body">
+      <p>Sprich am besten deinen Lehrer an oder stell die Frage direkt im Unterricht.</p>
+    </div>
+  </details>
+</main>
+<script src="layout.js"></script>
+<script src="auth-check.js"></script>
+<script src="script.js"></script>
 </body>
 </html>

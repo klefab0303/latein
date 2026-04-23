@@ -10,15 +10,23 @@
 <body data-page="analyse">
 <main>
   <div class="page-header">
-    <h2>Formen-Check</h2>
-    <p>Gib eine lateinische Form ein – wir bestimmen sie und suchen passende Vokabeln in den Büchern.</p>
+    <h2>Vokabelsuche</h2>
+    <p id="analyse-subtitle">Gib eine Vokabel (Grundform) ein und finde sie in den Büchern.</p>
+  </div>
+
+  <div id="analyse-tabs" class="tabs hidden" style="margin-bottom:1rem;">
+    <button class="tab active" data-mode="search" onclick="switchAnalyseMode('search')">Vokabel-Suche</button>
+    <button class="tab" data-mode="forms" onclick="switchAnalyseMode('forms')">Formen-Check <span class="badge badge-warning" style="margin-left:0.4rem;">Beta</span></button>
   </div>
 
   <div class="card" style="margin-bottom:1.25rem;">
     <div class="inline-form">
-      <input type="text" id="analyse-input" class="input" placeholder="z.B. amarem, puellae, sumus…" autocomplete="off">
-      <button class="btn btn-primary" onclick="runAnalyse();">Analysieren</button>
+      <input type="text" id="analyse-input" class="input" placeholder="z.B. videre, puella, amare…" autocomplete="off">
+      <button class="btn btn-primary" onclick="runAnalyse();">Suchen</button>
     </div>
+    <p id="analyse-hint" class="text-muted" style="margin-top:0.6rem; font-size:0.85rem;">
+      Tipp: Gib die Grundform ein (z.B. „videre"), nicht eine flektierte Form.
+    </p>
   </div>
 
   <div id="analyse-results"></div>
