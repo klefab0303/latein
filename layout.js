@@ -54,7 +54,6 @@
   const sidebar = `
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <div class="brand-mark">VT</div>
         <span>Vokabeltrainer</span>
       </div>
       <nav class="sidebar-nav">
