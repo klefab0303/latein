@@ -11,37 +11,55 @@
   <main>
     <div class="page-header">
       <h2>Statistik</h2>
-      <p>Dein Lernfortschritt auf einen Blick.</p>
+      <p>Dein Lernfortschritt im Detail.</p>
     </div>
 
     <div class="stats-grid" id="stat-overview">
-      <div class="stat-card"><div class="stat-label">Vokabeln</div><div class="stat-value" id="stat-total">0</div><div class="stat-trend">im aktuellen Buch</div></div>
       <div class="stat-card"><div class="stat-label">Geübt</div><div class="stat-value" id="stat-practiced">0</div><div class="stat-trend">Karten insgesamt</div></div>
       <div class="stat-card"><div class="stat-label">Trefferquote</div><div class="stat-value" id="stat-percentage">0%</div><div class="stat-trend">über alle Versuche</div></div>
-      <div class="stat-card"><div class="stat-label">Tests absolviert</div><div class="stat-value" id="stat-tests">0</div><div class="stat-trend">offizielle Vokabeltests</div></div>
+      <div class="stat-card"><div class="stat-label">Aktuelle Serie</div><div class="stat-value" id="stat-streak">0</div><div class="stat-trend">Tage in Folge</div></div>
+      <div class="stat-card"><div class="stat-label">Tests</div><div class="stat-value" id="stat-tests">0</div><div class="stat-trend">absolviert</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.25rem;">
+      <h3>Lernkalender</h3>
+      <p class="text-muted" style="margin: 0.25rem 0 1rem; font-size:0.9rem;">
+        Deine Aktivität der letzten 12 Wochen.
+      </p>
+      <div id="heatmap"></div>
     </div>
 
     <div class="card" style="margin-bottom: 1.25rem;">
       <h3>Lektionsfortschritt</h3>
       <p class="text-muted" style="margin: 0.25rem 0 1rem; font-size:0.9rem;">
-        Wie gut sitzen die Vokabeln pro Lektion (Karteikarten-Übungen)?
+        Wie gut sitzen die Vokabeln pro Lektion?
       </p>
       <div id="lesson-progress" class="lesson-progress-list"></div>
     </div>
 
     <div class="card" style="margin-bottom: 1.25rem;">
-      <h3>Karteikarten-Verlauf</h3>
-      <div id="bar-chart"></div>
-      <div class="chart-legend">
-        <span class="legend-item"><span class="legend-color known"></span> Gewusst</span>
-        <span class="legend-item"><span class="legend-color unknown"></span> Nicht gewusst</span>
-      </div>
+      <h3>Schwierigste Vokabeln</h3>
+      <p class="text-muted" style="margin: 0.25rem 0 1rem; font-size:0.9rem;">
+        Die zehn Vokabeln, die du am häufigsten nicht gewusst hast.
+      </p>
+      <div id="hardest-words"></div>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.25rem;">
+      <h3>Notenverlauf (Tests)</h3>
+      <p class="text-muted" style="margin: 0.25rem 0 1rem; font-size:0.9rem;">
+        Deine Trefferquote pro geschriebenem Test.
+      </p>
+      <div id="test-line-chart"></div>
     </div>
 
     <div class="card">
       <h3>Test-Historie</h3>
       <div id="test-history"></div>
     </div>
+
+    <!-- legacy element used by old chart functions -->
+    <div class="hidden"><span id="stat-total"></span><span id="stat-known"></span><div id="bar-chart"></div></div>
   </main>
   <script src="layout.js"></script>
   <script src="auth-check.js"></script>
