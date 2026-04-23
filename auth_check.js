@@ -4,7 +4,7 @@
 // ============================================================
 (function () {
   const PAGE = (document.body && document.body.dataset.page) || '';
-  const PROTECTED = ['schueler', 'lehrer', 'analyse', 'profil', 'statistik'];
+  const PROTECTED = ['schueler', 'lehrer', 'analyse', 'profil', 'statistik', 'info'];
   if (!PROTECTED.includes(PAGE)) return;
 
   const SESSION_FLAG = 'latein-account-checked';
