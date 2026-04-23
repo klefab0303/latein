@@ -7,9 +7,6 @@
   const PROTECTED = ['schueler', 'lehrer', 'analyse', 'profil', 'statistik', 'info'];
   if (!PROTECTED.includes(PAGE)) return;
 
-  const SESSION_FLAG = 'latein-account-checked';
-  if (sessionStorage.getItem(SESSION_FLAG) === '1') return;
-
   let user = null;
   try { user = JSON.parse(localStorage.getItem('latin-vocab-user') || 'null'); } catch {}
   if (!user || !user.id) return; // wird ohnehin auf Login umgeleitet
@@ -28,12 +25,10 @@
       if (!data) {
         // Account existiert nicht mehr
         localStorage.removeItem('latin-vocab-user');
-        sessionStorage.removeItem(SESSION_FLAG);
         alert('Dein Account existiert nicht mehr. Bitte melde dich erneut an.');
         window.location.href = 'index.html';
         return;
       }
-      sessionStorage.setItem(SESSION_FLAG, '1');
     });
   }
   check();
