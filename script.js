@@ -18,6 +18,12 @@ const VOCABULARIES_KEY = 'latin-vocab-vocabularies';
 const PRACTICE_RESULTS_KEY = 'latin-vocab-practice-results';
 const THEME_KEY = 'latin-vocab-theme';
 const USER_KEY = 'latin-vocab-user';
+// Session-Storage statt localStorage: Login geht beim Tab-Schließen verloren.
+const userStore = {
+  get() { try { return JSON.parse(sessionStorage.getItem(USER_KEY) || 'null'); } catch { return null; } },
+  set(u) { sessionStorage.setItem(USER_KEY, JSON.stringify(u)); },
+  clear() { sessionStorage.removeItem(USER_KEY); localStorage.removeItem(USER_KEY); }
+};
 
 // ============================================================
 // STATE
@@ -64,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (PAGE === 'info') {
     // info ist jetzt teil des app-shell (geschützt). Wenn nicht eingeloggt, geht's nur auf die alte Variante.
-    const u = (() => { try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null'); } catch { return null; } })();
+    const u = (() => { try { return JSON.parse(sessionStorage.getItem(USER_KEY) || 'null'); } catch { return null; } })();
     if (u) currentUser = u;
     return;
   }
@@ -72,8 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
   loadData();
 
   const savedUser = (() => {
-    try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null'); }
-    catch { localStorage.removeItem(USER_KEY); return null; }
+    try { return JSON.parse(sessionStorage.getItem(USER_KEY) || 'null'); }
+    catch { userStore.clear(); return null; }
   })();
 
   if (PAGE === 'login') {
@@ -111,10 +117,11 @@ document.addEventListener('DOMContentLoaded', () => {
     loadPresetVocabularies();
     setupSchuelerListeners();
     setGreeting();
+    handleClassDeepLink();
   } else if (PAGE === 'lehrer') {
     loadPresetVocabularies();
     setupLehrerListeners();
-    loadTeacherDashboard();
+    loadTeacherDashboard().then(handleClassDeepLink);
     setGreeting();
   } else if (PAGE === 'analyse') {
     setupAnalyseListeners();
@@ -220,7 +227,7 @@ async function login() {
   if (error || !data) return showError('auth-error', 'Ungültiger Benutzername oder Passwort.');
 
   currentUser = data;
-  localStorage.setItem(USER_KEY, JSON.stringify(data));
+  userStore.set(data);
   showError('auth-error', '');
   redirectToRoleHome();
 }
@@ -250,14 +257,14 @@ async function register() {
   }
 
   currentUser = data;
-  localStorage.setItem(USER_KEY, JSON.stringify(data));
+  userStore.set(data);
   showError('auth-error', '');
   redirectToRoleHome();
 }
 
 function logout() {
   currentUser = null;
-  localStorage.removeItem(USER_KEY);
+  userStore.clear();
   window.location.href = 'index.html';
 }
 
@@ -731,6 +738,7 @@ async function createClass() {
   if (!name) return;
   await db.from('classes').insert({ teacher_id: currentUser.id, name });
   document.getElementById('new-class-name').value = '';
+  closeClassModal();
   loadTeacherDashboard();
 }
 
@@ -1518,7 +1526,7 @@ async function saveName() {
   const { error } = await db.from('users').update({ vorname: v, nachname: n }).eq('id', currentUser.id);
   if (error) { msg.className = 'error-msg'; msg.textContent = 'Fehler beim Speichern.'; return; }
   currentUser.vorname = v; currentUser.nachname = n;
-  localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+  userStore.set(currentUser);
   msg.textContent = 'Gespeichert. Lade die Seite neu, um den Namen überall zu sehen.';
   initProfilePage();
 }
@@ -1536,7 +1544,7 @@ async function changePassword() {
   const { error } = await db.from('users').update({ passwort: newPw }).eq('id', currentUser.id);
   if (error) { msg.className = 'error-msg'; msg.textContent = 'Fehler beim Ändern.'; return; }
   currentUser.passwort = newPw;
-  localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+  userStore.set(currentUser);
   document.getElementById('pw-old').value = '';
   document.getElementById('pw-new').value = '';
   document.getElementById('pw-new2').value = '';
@@ -1549,7 +1557,7 @@ async function deleteAccount() {
   if (!db) return alert('Keine Datenbankverbindung.');
   const { error } = await db.from('users').delete().eq('id', currentUser.id);
   if (error) return alert('Fehler beim Löschen: ' + error.message);
-  localStorage.removeItem(USER_KEY);
+  userStore.clear();
   sessionStorage.clear();
   alert('Dein Account wurde gelöscht.');
   window.location.href = 'index.html';
@@ -1764,4 +1772,90 @@ function renderTestLineChart(tests) {
 window.saveName = saveName;
 window.changePassword = changePassword;
 window.deleteAccount = deleteAccount;
+
+// ============================================================
+// MODAL: Klasse anlegen
+// ============================================================
+function openClassModal() {
+  const m = document.getElementById('class-modal');
+  if (!m) return;
+  m.classList.remove('hidden');
+  setTimeout(() => {
+    const inp = document.getElementById('new-class-name');
+    if (inp) inp.focus();
+  }, 30);
+}
+function closeClassModal() {
+  const m = document.getElementById('class-modal');
+  if (m) m.classList.add('hidden');
+  const inp = document.getElementById('new-class-name');
+  if (inp) inp.value = '';
+}
+window.openClassModal = openClassModal;
+window.closeClassModal = closeClassModal;
+
+// Esc schließt Modal
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const m = document.getElementById('class-modal');
+    if (m && !m.classList.contains('hidden')) closeClassModal();
+  }
+});
+
+// ============================================================
+// DEEP-LINK ?class=...
+// ============================================================
+function handleClassDeepLink() {
+  const params = new URLSearchParams(window.location.search);
+  const classId = params.get('class');
+  if (!classId) return;
+  if (PAGE === 'lehrer') {
+    // Klasse direkt öffnen
+    db.from('classes').select('id,name').eq('id', classId).maybeSingle().then(({ data }) => {
+      if (data) selectClass(data.id, data.name);
+    });
+  } else if (PAGE === 'schueler') {
+    // Tests dieser Klasse anzeigen (Studenten-Dashboard mit Filter)
+    showStudentClassView(classId);
+  }
+}
+
+async function showStudentClassView(classId) {
+  if (!db || !currentUser) return;
+  // Klasse holen
+  const { data: cls } = await db.from('classes').select('id,name').eq('id', classId).maybeSingle();
+  if (!cls) return;
+  // Tests dieser Klasse
+  const { data: tests } = await db.from('tests').select('*').eq('class_id', classId).order('created_at', { ascending: false });
+  // Eigene Ergebnisse
+  const { data: myResults } = await db.from('results').select('*').eq('student_id', currentUser.id);
+  const resultMap = new Map((myResults || []).map(r => [r.test_id, r]));
+
+  // View dynamisch in #home-view einsetzen
+  const home = document.getElementById('home-view');
+  if (!home) return;
+  showView('home-view');
+  home.innerHTML = `
+    <div class="page-header">
+      <a href="schueler.html" class="btn btn-ghost btn-small" style="margin-bottom:0.5rem;">← Übersicht</a>
+      <h2>${esc(cls.name)}</h2>
+      <p>Tests in dieser Klasse</p>
+    </div>
+    <div class="card">
+      ${(!tests || tests.length === 0) ? '<p class="text-muted">In dieser Klasse gibt es noch keine Tests.</p>' : `
+        <div class="card-grid">
+          ${tests.map(t => {
+            const r = resultMap.get(t.id);
+            const status = r ? `<span class="text-muted">${r.score}/${r.total}</span>` : '<span class="text-muted">offen</span>';
+            return `<div class="card-item">
+              <h4>${esc(t.name)}</h4>
+              <p class="text-muted">Test-ID: <strong>${esc(t.short_id || t.id.slice(0,6))}</strong></p>
+              <p>${status}</p>
+            </div>`;
+          }).join('')}
+        </div>
+      `}
+    </div>
+  `;
+}
 window.logout = logout;
