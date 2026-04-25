@@ -36,12 +36,30 @@
     <div class="card">
       <div class="section-header" style="margin:0 0 1rem;">
         <h3 style="margin:0;">Meine Klassen</h3>
-        <div class="inline-form">
-          <input type="text" id="new-class-name" placeholder="Klassenname">
+        <button class="btn btn-primary btn-small" onclick="openClassModal();">Neue Klasse</button>
+      </div>
+      <div id="classes-list" class="card-grid"></div>
+    </div>
+
+    <!-- Modal: Neue Klasse anlegen -->
+    <div id="class-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeClassModal();">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="class-modal-title">
+        <div class="modal-header">
+          <h3 id="class-modal-title">Neue Klasse anlegen</h3>
+          <button class="icon-btn" onclick="closeClassModal();" aria-label="Schließen">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="new-class-name">Klassenname</label>
+            <input type="text" id="new-class-name" placeholder="z. B. 7a Latein" autocomplete="off">
+          </div>
+          <p class="text-muted" style="font-size:0.85rem; margin:0;">Du kannst danach Schüler hinzufügen und Tests erstellen.</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeClassModal();">Abbrechen</button>
           <button class="btn btn-primary" onclick="createClass();">Anlegen</button>
         </div>
       </div>
-      <div id="classes-list" class="card-grid"></div>
     </div>
   </div>
 

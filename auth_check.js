@@ -8,8 +8,14 @@
   if (!PROTECTED.includes(PAGE)) return;
 
   let user = null;
-  try { user = JSON.parse(localStorage.getItem('latin-vocab-user') || 'null'); } catch {}
-  if (!user || !user.id) return; // wird ohnehin auf Login umgeleitet
+  try { user = JSON.parse(sessionStorage.getItem('latin-vocab-user') || 'null'); } catch {}
+  // Falls Reste in localStorage liegen (alte Version), wegräumen.
+  try { localStorage.removeItem('latin-vocab-user'); } catch {}
+  if (!user || !user.id) {
+    // Keine Session in diesem Tab → sofort zum Login
+    window.location.replace('index.html');
+    return;
+  }
 
   // Wartet bis supabase-Client verfügbar ist
   function check() {
@@ -24,9 +30,10 @@
       if (error) return; // Netzwerkfehler: nicht ausloggen
       if (!data) {
         // Account existiert nicht mehr
-        localStorage.removeItem('latin-vocab-user');
+        sessionStorage.removeItem('latin-vocab-user');
+        try { localStorage.removeItem('latin-vocab-user'); } catch {}
         alert('Dein Account existiert nicht mehr. Bitte melde dich erneut an.');
-        window.location.href = 'index.html';
+        window.location.replace('index.html');
         return;
       }
     });
