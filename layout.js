@@ -9,7 +9,7 @@
   const SIDEBAR_KEY = 'latein-sidebar-collapsed';
 
   let user = null;
-  try { user = JSON.parse(localStorage.getItem('latin-vocab-user') || 'null'); } catch {}
+  try { user = JSON.parse(sessionStorage.getItem('latin-vocab-user') || 'null'); } catch {}
   const role = user && user.rolle === 'lehrer' ? 'lehrer' : 'schueler';
 
   // Lucide-style inline SVG icons
@@ -31,13 +31,11 @@
     ? [
         { label: 'Übersicht', icon: I.home, href: 'lehrer.html', match: ['lehrer'] },
         { label: 'Vokabelsuche', icon: I.search, href: 'analyse.html', match: ['analyse'] },
-        { label: 'Profil', icon: I.user, href: 'profil.html', match: ['profil'] },
       ]
     : [
         { label: 'Übersicht', icon: I.home, href: 'schueler.html', match: ['schueler'] },
         { label: 'Statistik', icon: I.chart, href: 'statistik.html', match: ['statistik'] },
         { label: 'Vokabelsuche', icon: I.search, href: 'analyse.html', match: ['analyse'] },
-        { label: 'Profil', icon: I.user, href: 'profil.html', match: ['profil'] },
       ];
 
   const titleByPage = {
@@ -141,7 +139,11 @@
 
   document.getElementById('__logout').addEventListener('click', () => {
     if (typeof window.logout === 'function') window.logout();
-    else { localStorage.removeItem('latin-vocab-user'); window.location.href = 'index.html'; }
+    else {
+      sessionStorage.removeItem('latin-vocab-user');
+      try { localStorage.removeItem('latin-vocab-user'); } catch {}
+      window.location.replace('index.html');
+    }
   });
 
   // Load user's classes into sidebar
@@ -177,7 +179,7 @@
         return;
       }
       el.innerHTML = classes.map(c => `
-        <a class="nav-link nav-link-sub" href="${role === 'lehrer' ? 'lehrer.html?class=' + encodeURIComponent(c.id) : 'profil.html#class-' + encodeURIComponent(c.id)}">
+        <a class="nav-link nav-link-sub" href="${role === 'lehrer' ? 'lehrer.html?class=' + encodeURIComponent(c.id) : 'schueler.html?class=' + encodeURIComponent(c.id)}">
           <span class="nav-icon">${I.users}</span>
           <span>${escapeHtml(c.name)}</span>
         </a>
