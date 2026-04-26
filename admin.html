@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vokabeltrainer – Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body data-page="admin">
+  <main>
+    <div class="page-header">
+      <h2>Admin</h2>
+      <p>Nutzerverwaltung, Bans und IP-Sperren.</p>
+    </div>
+
+    <div id="admin-loading" class="card"><p class="text-muted">Prüfe Berechtigung…</p></div>
+
+    <div id="admin-denied" class="card hidden" style="border-color: var(--danger);">
+      <h3 style="color: var(--danger);">Kein Zugriff</h3>
+      <p class="text-muted">Du bist nicht als Admin angemeldet.</p>
+      <a class="btn btn-primary" href="index.html">Zur Anmeldung</a>
+    </div>
+
+    <div id="admin-content" class="hidden">
+      <div class="card" style="margin-bottom: 1.25rem;">
+        <h3>Alle Nutzer</h3>
+        <div style="overflow-x:auto; margin-top:0.75rem;">
+          <table class="data-table" id="users-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>E-Mail</th>
+                <th>Rolle(n)</th>
+                <th>Letzte IP</th>
+                <th>Status</th>
+                <th>Aktionen</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom: 1.25rem;">
+        <h3>Gesperrte IPs</h3>
+        <div style="display:flex; gap:0.5rem; margin: 0.75rem 0; flex-wrap:wrap;">
+          <input type="text" id="new-ip" placeholder="z.B. 1.2.3.4" style="flex:1; min-width:160px;">
+          <input type="text" id="new-ip-reason" placeholder="Grund (optional)" style="flex:2; min-width:160px;">
+          <button class="btn btn-danger" id="ban-ip-btn">IP sperren</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table" id="ips-table">
+            <thead>
+              <tr><th>IP</th><th>Grund</th><th>Gesperrt am</th><th>Aktion</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="layout.js"></script>
+  <script src="auth-check.js"></script>
+  <script>
+    (async function () {
+      const SUPABASE_URL = 'https://jxkupplncsmextsfrlbz.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4a3VwcGxuY3NtZXh0c2ZybGJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwOTY3NjcsImV4cCI6MjA4OTY3Mjc2N30.32M4Pf1-w_9qSE4e9ALpzYdYzyWCeOM_hc_LA1OARJs';
+      function waitSb(cb){ if (window.supabase) cb(); else setTimeout(()=>waitSb(cb), 50); }
+      waitSb(async () => {
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Wir nutzen aktuell noch das alte custom-Login (sessionStorage). Für die
+        // SECURITY-DEFINER Admin-Funktionen brauchen wir aber einen auth.uid().
+        // Solange Supabase Auth nicht aktiv ist, prüfen wir admin-Rolle direkt
+        // über user_roles + die im sessionStorage gespeicherte user.id.
+        let user = null;
+        try { user = JSON.parse(sessionStorage.getItem('latin-vocab-user') || 'null'); } catch {}
+
+        const loadingEl = document.getElementById('admin-loading');
+        const deniedEl  = document.getElementById('admin-denied');
+        const contentEl = document.getElementById('admin-content');
+
+        if (!user) { loadingEl.classList.add('hidden'); deniedEl.classList.remove('hidden'); return; }
+
+        // Admin-Rollen-Check (direkt auf user_roles, da kein auth.uid() vorhanden)
+        const { data: rolesData, error: rolesErr } = await db
+          .from('user_roles').select('role').eq('user_id', user.id);
+        const isAdmin = !rolesErr && (rolesData || []).some(r => r.role === 'admin');
+
+        if (!isAdmin) { loadingEl.classList.add('hidden'); deniedEl.classList.remove('hidden'); return; }
+
+        loadingEl.classList.add('hidden');
+        contentEl.classList.remove('hidden');
+
+        await Promise.all([loadUsers(), loadBannedIps()]);
+
+        document.getElementById('ban-ip-btn').addEventListener('click', async () => {
+          const ip = document.getElementById('new-ip').value.trim();
+          const reason = document.getElementById('new-ip-reason').value.trim();
+          if (!ip) return alert('Bitte IP angeben.');
+          const { error } = await db.from('banned_ips').upsert({ ip, reason, banned_by: user.id });
+          if (error) return alert('Fehler: ' + error.message);
+          document.getElementById('new-ip').value = '';
+          document.getElementById('new-ip-reason').value = '';
+          await loadBannedIps();
+        });
+
+        async function loadUsers() {
+          // Direktselect (RLS muss Admin lesen erlauben). Falls dir das zu offen ist,
+          // tausche das später gegen db.rpc('admin_list_users').
+          const { data: users, error } = await db
+            .from('users')
+            .select('id,vorname,nachname,email,last_ip,is_banned,banned_at,banned_reason,created_at')
+            .order('created_at', { ascending: false });
+          if (error) { console.error(error); return; }
+
+          const { data: roles } = await db.from('user_roles').select('user_id, role');
+          const rolesByUser = {};
+          (roles || []).forEach(r => {
+            (rolesByUser[r.user_id] = rolesByUser[r.user_id] || []).push(r.role);
+          });
+
+          const tbody = document.querySelector('#users-table tbody');
+          tbody.innerHTML = (users || []).map(u => {
+            const rs = (rolesByUser[u.id] || []).join(', ') || '–';
+            const status = u.is_banned
+              ? `<span style="color:var(--danger);">gebannt</span>`
+              : `<span class="text-muted">aktiv</span>`;
+            const ip = u.last_ip || '–';
+            return `
+              <tr data-uid="${u.id}" data-ip="${u.last_ip || ''}">
+                <td>${esc(u.vorname)} ${esc(u.nachname)}</td>
+                <td>${esc(u.email)}</td>
+                <td>${esc(rs)}</td>
+                <td><code>${esc(ip)}</code></td>
+                <td>${status}</td>
+                <td style="white-space:nowrap;">
+                  ${u.is_banned
+                    ? `<button class="btn btn-secondary btn-sm" data-act="unban">Entbannen</button>`
+                    : `<button class="btn btn-danger btn-sm" data-act="ban">Bannen</button>
+                       <button class="btn btn-danger btn-sm" data-act="ban-ip">+ IP bannen</button>`}
+                  <button class="btn btn-danger btn-sm" data-act="delete">Löschen</button>
+                </td>
+              </tr>`;
+          }).join('') || `<tr><td colspan="6" class="text-muted">Keine Nutzer.</td></tr>`;
+
+          tbody.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => handleUserAction(btn));
+          });
+        }
+
+        async function handleUserAction(btn) {
+          const tr = btn.closest('tr');
+          const uid = tr.dataset.uid;
+          const ip = tr.dataset.ip;
+          const act = btn.dataset.act;
+
+          if (act === 'ban' || act === 'ban-ip') {
+            const reason = prompt('Grund für den Bann?') || '';
+            const { error } = await db.from('users')
+              .update({ is_banned: true, banned_at: new Date().toISOString(), banned_reason: reason })
+              .eq('id', uid);
+            if (error) return alert('Fehler: ' + error.message);
+            if (act === 'ban-ip' && ip) {
+              await db.from('banned_ips').upsert({ ip, reason, banned_by: user.id });
+            }
+          } else if (act === 'unban') {
+            const { error } = await db.from('users')
+              .update({ is_banned: false, banned_at: null, banned_reason: null })
+              .eq('id', uid);
+            if (error) return alert('Fehler: ' + error.message);
+          } else if (act === 'delete') {
+            if (!confirm('Diesen Nutzer ENDGÜLTIG löschen?')) return;
+            // Falls Supabase Auth aktiv: rpc('admin_delete_user', ...).
+            const { error } = await db.from('users').delete().eq('id', uid);
+            if (error) return alert('Fehler beim Löschen: ' + error.message);
+          }
+          await Promise.all([loadUsers(), loadBannedIps()]);
+        }
+
+        async function loadBannedIps() {
+          const { data, error } = await db
+            .from('banned_ips').select('*').order('banned_at', { ascending: false });
+          if (error) return;
+          const tbody = document.querySelector('#ips-table tbody');
+          tbody.innerHTML = (data || []).map(b => `
+            <tr data-ip="${esc(b.ip)}">
+              <td><code>${esc(b.ip)}</code></td>
+              <td>${esc(b.reason || '')}</td>
+              <td>${new Date(b.banned_at).toLocaleString('de-DE')}</td>
+              <td><button class="btn btn-secondary btn-sm" data-act="unban-ip">Entsperren</button></td>
+            </tr>
+          `).join('') || `<tr><td colspan="4" class="text-muted">Keine gesperrten IPs.</td></tr>`;
+
+          tbody.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const ip = btn.closest('tr').dataset.ip;
+              await db.from('banned_ips').delete().eq('ip', ip);
+              await loadBannedIps();
+            });
+          });
+        }
+
+        function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
+      });
+    })();
+  </script>
+</body>
+</html>
