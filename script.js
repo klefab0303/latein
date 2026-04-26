@@ -204,7 +204,20 @@ function switchAuthTab(tab) {
   showError('auth-error', '');
 }
 
+// Fallback, falls RPC verify_teacher_code (noch) nicht existiert.
 const TEACHER_REGISTRATION_CODE = 'fabian2026';
+
+async function isValidTeacherCode(code) {
+  if (!db) return code === TEACHER_REGISTRATION_CODE;
+  try {
+    const { data, error } = await db.rpc('verify_teacher_code', { _code: code });
+    if (error) throw error;
+    return data === true;
+  } catch (e) {
+    console.warn('verify_teacher_code RPC fehlgeschlagen, nutze Fallback:', e);
+    return code === TEACHER_REGISTRATION_CODE;
+  }
+}
 
 function selectRole(role) {
   selectedRole = role;
@@ -219,19 +232,15 @@ function selectRole(role) {
 
 async function login() {
   if (!db) return showError('auth-error', 'Datenbankverbindung fehlgeschlagen.');
-  const email = document.getElementById('login-email').value.trim();
+  const username = document.getElementById('login-username').value.trim();
   const password = document.getElementById('login-password').value.trim();
-  if (!email || !password) return showError('auth-error', 'Bitte alle Felder ausfüllen.');
+  if (!username || !password) return showError('auth-error', 'Bitte alle Felder ausfüllen.');
 
-  const { data: authData, error: authError } = await db.auth.signInWithPassword({ email, password });
-  if (authError) return showError('auth-error', 'Ungültige E-Mail oder Passwort.');
+  const { data, error } = await db.from('users').select('*').eq('benutzername', username).eq('passwort', password).single();
+  if (error || !data) return showError('auth-error', 'Ungültiger Benutzername oder Passwort.');
 
-  const { data: profile, error: profileError } = await db
-    .from('users').select('*').eq('id', authData.user.id).single();
-  if (profileError || !profile) return showError('auth-error', 'Profil konnte nicht geladen werden.');
-
-  currentUser = profile;
-  userStore.set(profile);
+  currentUser = data;
+  userStore.set(data);
   showError('auth-error', '');
   redirectToRoleHome();
 }
@@ -240,48 +249,34 @@ async function register() {
   if (!db) return showError('auth-error', 'Datenbankverbindung fehlgeschlagen.');
   const vorname = document.getElementById('reg-vorname').value.trim();
   const nachname = document.getElementById('reg-nachname').value.trim();
-  const email = document.getElementById('reg-email').value.trim();
-  const password = document.getElementById('reg-password').value.trim();
+  const username = document.getElementById('reg-username').value.trim();
+  const password = document.getElementById('reg-password').value.trim() || '0000';
 
-  if (!vorname || !nachname || !email || !password) return showError('auth-error', 'Bitte alle Felder ausfüllen.');
-  if (password.length < 6) return showError('auth-error', 'Passwort muss mindestens 6 Zeichen haben.');
+  if (!vorname || !nachname || !username) return showError('auth-error', 'Bitte alle Felder ausfüllen.');
 
   if (selectedRole === 'lehrer') {
     const code = document.getElementById('reg-teacher-code').value.trim();
     if (!code) return showError('auth-error', 'Bitte gib den Lehrer-Code ein.');
-    if (code !== TEACHER_REGISTRATION_CODE) return showError('auth-error', 'Ungültiger Lehrer-Code.');
+    const ok = await isValidTeacherCode(code);
+    if (!ok) return showError('auth-error', 'Ungültiger Lehrer-Code.');
   }
 
-  const { data: authData, error: authError } = await db.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: `${window.location.origin}/index.html`,
-      data: { vorname, nachname, rolle: selectedRole }
-    }
-  });
+  const { data, error } = await db.from('users').insert({
+    vorname, nachname, benutzername: username, passwort: password, rolle: selectedRole
+  }).select().single();
 
-  if (authError) {
-    if ((authError.message || '').toLowerCase().includes('already'))
-      return showError('auth-error', 'Diese E-Mail ist bereits registriert.');
-    return showError('auth-error', 'Fehler bei der Registrierung: ' + authError.message);
+  if (error) {
+    if (error.code === '23505') return showError('auth-error', 'Benutzername bereits vergeben.');
+    return showError('auth-error', 'Fehler bei der Registrierung.');
   }
 
-  // Wenn E-Mail-Bestätigung in Supabase aktiviert ist, gibt es noch keine Session.
-  if (!authData.session) {
-    return showError('auth-error', 'Bitte bestätige deine E-Mail-Adresse und logge dich danach ein.');
-  }
-
-  // Profil wird vom DB-Trigger automatisch in public.users angelegt.
-  const { data: profile } = await db.from('users').select('*').eq('id', authData.user.id).single();
-  currentUser = profile;
-  userStore.set(profile);
+  currentUser = data;
+  userStore.set(data);
   showError('auth-error', '');
   redirectToRoleHome();
 }
 
-async function logout() {
-  try { if (db) await db.auth.signOut(); } catch {}
+function logout() {
   currentUser = null;
   userStore.clear();
   window.location.href = 'index.html';
@@ -795,17 +790,23 @@ async function loadClassStudents() {
   }
   container.innerHTML = members.map(m => `
     <div class="student-list-item">
-      <span>${esc(m.users.vorname)} ${esc(m.users.nachname)} (${esc(m.users.email)})</span>
+      <span>${esc(m.users.vorname)} ${esc(m.users.nachname)} (${esc(m.users.benutzername)})</span>
       <div style="display:flex; gap:0.4rem;">
+        <button class="btn btn-secondary btn-small" onclick="resetStudentPassword('${m.users.id}', '${esc(m.users.vorname + ' ' + m.users.nachname)}')">Passwort zurücksetzen</button>
         <button class="btn btn-danger btn-small" onclick="removeStudent('${m.id}')">Entfernen</button>
       </div>
     </div>`).join('');
 }
 
-// Hinweis: Passwort-Reset durch Lehrer ist mit Supabase Auth nur über eine
-// Edge Function mit Service-Role-Key möglich. Schüler können ihr Passwort
-// jederzeit selbst per "Passwort vergessen?"-Mail in Supabase zurücksetzen
-// lassen (db.auth.resetPasswordForEmail).
+async function resetStudentPassword(studentId, name) {
+  const newPw = prompt(`Neues temporäres Passwort für ${name} festlegen (mind. 4 Zeichen):`, 'start1234');
+  if (!newPw) return;
+  if (newPw.length < 4) { alert('Passwort braucht mindestens 4 Zeichen.'); return; }
+  const { error } = await db.from('users').update({ passwort: newPw }).eq('id', studentId);
+  if (error) { alert('Fehler beim Zurücksetzen.'); return; }
+  alert(`Passwort für ${name} wurde auf „${newPw}" gesetzt. Bitte gib es weiter – der Schüler sollte es danach im Profil sofort selbst ändern.`);
+}
+window.resetStudentPassword = resetStudentPassword;
 
 function setupStudentSearch() {
   const input = document.getElementById('student-search-input');
@@ -833,7 +834,7 @@ async function renderStudentSearch(query) {
   // Alle Schüler laden
   const { data: students, error: studErr } = await db
     .from('users')
-    .select('id, vorname, nachname, email')
+    .select('id, vorname, nachname, benutzername')
     .eq('rolle', 'schueler');
 
   if (studErr) {
@@ -859,7 +860,7 @@ async function renderStudentSearch(query) {
       if (!q) return true;
       return (s.vorname || '').toLowerCase().includes(q)
         || (s.nachname || '').toLowerCase().includes(q)
-        || (s.email || '').toLowerCase().includes(q);
+        || (s.benutzername || '').toLowerCase().includes(q);
     })
     .slice(0, 50);
 
@@ -869,7 +870,7 @@ async function renderStudentSearch(query) {
     dropdown.innerHTML = filtered.map(s =>
       `<div class="dropdown-item" onclick="addStudentById('${s.id}')">
          <strong>${esc(s.vorname)} ${esc(s.nachname)}</strong>
-         <span class="text-muted"> · ${esc(s.email)}</span>
+         <span class="text-muted"> · ${esc(s.benutzername)}</span>
        </div>`
     ).join('');
   }
@@ -1463,7 +1464,7 @@ function initProfilePage() {
   const nm = document.getElementById('profil-name');
   if (nm) nm.textContent = `${currentUser.vorname} ${currentUser.nachname}`;
   const meta = document.getElementById('profil-meta');
-  if (meta) meta.textContent = `${currentUser.email} · ${currentUser.rolle === 'lehrer' ? 'Lehrer' : 'Schüler'}`;
+  if (meta) meta.textContent = `${currentUser.benutzername} · ${currentUser.rolle === 'lehrer' ? 'Lehrer' : 'Schüler'}`;
   // Felder vorbelegen
   const v = document.getElementById('prof-vorname');
   const n = document.getElementById('prof-nachname');
@@ -1552,18 +1553,12 @@ async function changePassword() {
   msg.textContent = ''; msg.className = 'success-msg';
   if (!oldPw || !newPw || !newPw2) { msg.className = 'error-msg'; msg.textContent = 'Bitte alle Felder ausfüllen.'; return; }
   if (newPw !== newPw2) { msg.className = 'error-msg'; msg.textContent = 'Die neuen Passwörter stimmen nicht überein.'; return; }
-  if (newPw.length < 6) { msg.className = 'error-msg'; msg.textContent = 'Neues Passwort braucht mindestens 6 Zeichen.'; return; }
-  if (!db || !currentUser) { msg.className = 'error-msg'; msg.textContent = 'Keine Datenbankverbindung.'; return; }
-
-  // Aktuelles Passwort über Supabase Auth verifizieren
-  const { error: signInErr } = await db.auth.signInWithPassword({
-    email: currentUser.email, password: oldPw
-  });
-  if (signInErr) { msg.className = 'error-msg'; msg.textContent = 'Aktuelles Passwort ist falsch.'; return; }
-
-  const { error } = await db.auth.updateUser({ password: newPw });
-  if (error) { msg.className = 'error-msg'; msg.textContent = 'Fehler beim Ändern: ' + error.message; return; }
-
+  if (newPw.length < 4) { msg.className = 'error-msg'; msg.textContent = 'Neues Passwort braucht mindestens 4 Zeichen.'; return; }
+  if (oldPw !== currentUser.passwort) { msg.className = 'error-msg'; msg.textContent = 'Aktuelles Passwort ist falsch.'; return; }
+  const { error } = await db.from('users').update({ passwort: newPw }).eq('id', currentUser.id);
+  if (error) { msg.className = 'error-msg'; msg.textContent = 'Fehler beim Ändern.'; return; }
+  currentUser.passwort = newPw;
+  userStore.set(currentUser);
   document.getElementById('pw-old').value = '';
   document.getElementById('pw-new').value = '';
   document.getElementById('pw-new2').value = '';
