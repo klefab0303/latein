@@ -31,11 +31,13 @@
     ? [
         { label: 'Übersicht', icon: I.home, href: 'lehrer.html', match: ['lehrer'] },
         { label: 'Vokabelsuche', icon: I.search, href: 'analyse.html', match: ['analyse'] },
+        { label: 'Profil', icon: I.user, href: 'profil.html', match: ['profil'] },
       ]
     : [
         { label: 'Übersicht', icon: I.home, href: 'schueler.html', match: ['schueler'] },
         { label: 'Statistik', icon: I.chart, href: 'statistik.html', match: ['statistik'] },
         { label: 'Vokabelsuche', icon: I.search, href: 'analyse.html', match: ['analyse'] },
+        { label: 'Profil', icon: I.user, href: 'profil.html', match: ['profil'] },
       ];
 
   const titleByPage = {
