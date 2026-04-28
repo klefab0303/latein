@@ -71,25 +71,20 @@
       waitSb(async () => {
         const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Wir nutzen aktuell noch das alte custom-Login (sessionStorage). Für die
-        // SECURITY-DEFINER Admin-Funktionen brauchen wir aber einen auth.uid().
-        // Solange Supabase Auth nicht aktiv ist, prüfen wir admin-Rolle direkt
-        // über user_roles + die im sessionStorage gespeicherte user.id.
-        let user = null;
-        try { user = JSON.parse(sessionStorage.getItem('latin-vocab-user') || 'null'); } catch {}
-
         const loadingEl = document.getElementById('admin-loading');
         const deniedEl  = document.getElementById('admin-denied');
         const contentEl = document.getElementById('admin-content');
 
-        if (!user) { loadingEl.classList.add('hidden'); deniedEl.classList.remove('hidden'); return; }
+        // Auth-Session holen
+        const { data: sessRes } = await db.auth.getSession();
+        const authUser = sessRes?.session?.user;
+        if (!authUser) { loadingEl.classList.add('hidden'); deniedEl.classList.remove('hidden'); return; }
 
-        // Admin-Rollen-Check (direkt auf user_roles, da kein auth.uid() vorhanden)
-        const { data: rolesData, error: rolesErr } = await db
-          .from('user_roles').select('role').eq('user_id', user.id);
-        const isAdmin = !rolesErr && (rolesData || []).some(r => r.role === 'admin');
-
-        if (!isAdmin) { loadingEl.classList.add('hidden'); deniedEl.classList.remove('hidden'); return; }
+        // Admin-Rolle serverseitig prüfen
+        const { data: isAdmin, error: adminErr } = await db.rpc('is_current_user_admin');
+        if (adminErr || !isAdmin) {
+          loadingEl.classList.add('hidden'); deniedEl.classList.remove('hidden'); return;
+        }
 
         loadingEl.classList.add('hidden');
         contentEl.classList.remove('hidden');
@@ -100,7 +95,7 @@
           const ip = document.getElementById('new-ip').value.trim();
           const reason = document.getElementById('new-ip-reason').value.trim();
           if (!ip) return alert('Bitte IP angeben.');
-          const { error } = await db.from('banned_ips').upsert({ ip, reason, banned_by: user.id });
+          const { error } = await db.rpc('admin_ban_ip', { _ip: ip, _reason: reason });
           if (error) return alert('Fehler: ' + error.message);
           document.getElementById('new-ip').value = '';
           document.getElementById('new-ip-reason').value = '';
@@ -108,23 +103,11 @@
         });
 
         async function loadUsers() {
-          // Direktselect (RLS muss Admin lesen erlauben). Falls dir das zu offen ist,
-          // tausche das später gegen db.rpc('admin_list_users').
-          const { data: users, error } = await db
-            .from('users')
-            .select('id,vorname,nachname,email,last_ip,is_banned,banned_at,banned_reason,created_at')
-            .order('created_at', { ascending: false });
+          const { data: users, error } = await db.rpc('admin_list_users');
           if (error) { console.error(error); return; }
-
-          const { data: roles } = await db.from('user_roles').select('user_id, role');
-          const rolesByUser = {};
-          (roles || []).forEach(r => {
-            (rolesByUser[r.user_id] = rolesByUser[r.user_id] || []).push(r.role);
-          });
-
           const tbody = document.querySelector('#users-table tbody');
           tbody.innerHTML = (users || []).map(u => {
-            const rs = (rolesByUser[u.id] || []).join(', ') || '–';
+            const rs = (u.roles || []).join(', ') || '–';
             const status = u.is_banned
               ? `<span style="color:var(--danger);">gebannt</span>`
               : `<span class="text-muted">aktiv</span>`;
@@ -154,35 +137,27 @@
         async function handleUserAction(btn) {
           const tr = btn.closest('tr');
           const uid = tr.dataset.uid;
-          const ip = tr.dataset.ip;
           const act = btn.dataset.act;
 
           if (act === 'ban' || act === 'ban-ip') {
             const reason = prompt('Grund für den Bann?') || '';
-            const { error } = await db.from('users')
-              .update({ is_banned: true, banned_at: new Date().toISOString(), banned_reason: reason })
-              .eq('id', uid);
+            const { error } = await db.rpc('admin_ban_user', {
+              _user_id: uid, _reason: reason, _ban_ip: act === 'ban-ip'
+            });
             if (error) return alert('Fehler: ' + error.message);
-            if (act === 'ban-ip' && ip) {
-              await db.from('banned_ips').upsert({ ip, reason, banned_by: user.id });
-            }
           } else if (act === 'unban') {
-            const { error } = await db.from('users')
-              .update({ is_banned: false, banned_at: null, banned_reason: null })
-              .eq('id', uid);
+            const { error } = await db.rpc('admin_unban_user', { _user_id: uid });
             if (error) return alert('Fehler: ' + error.message);
           } else if (act === 'delete') {
             if (!confirm('Diesen Nutzer ENDGÜLTIG löschen?')) return;
-            // Falls Supabase Auth aktiv: rpc('admin_delete_user', ...).
-            const { error } = await db.from('users').delete().eq('id', uid);
+            const { error } = await db.rpc('admin_delete_user', { _user_id: uid });
             if (error) return alert('Fehler beim Löschen: ' + error.message);
           }
           await Promise.all([loadUsers(), loadBannedIps()]);
         }
 
         async function loadBannedIps() {
-          const { data, error } = await db
-            .from('banned_ips').select('*').order('banned_at', { ascending: false });
+          const { data, error } = await db.rpc('admin_list_banned_ips');
           if (error) return;
           const tbody = document.querySelector('#ips-table tbody');
           tbody.innerHTML = (data || []).map(b => `
@@ -197,7 +172,8 @@
           tbody.querySelectorAll('button').forEach(btn => {
             btn.addEventListener('click', async () => {
               const ip = btn.closest('tr').dataset.ip;
-              await db.from('banned_ips').delete().eq('ip', ip);
+              const { error } = await db.rpc('admin_unban_ip', { _ip: ip });
+              if (error) return alert('Fehler: ' + error.message);
               await loadBannedIps();
             });
           });
