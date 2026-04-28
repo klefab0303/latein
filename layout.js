@@ -10,7 +10,7 @@
 
   let user = null;
   try { user = JSON.parse(sessionStorage.getItem('latin-vocab-user') || 'null'); } catch {}
-  const role = user && user.rolle === 'lehrer' ? 'lehrer' : 'schueler';
+  const role = user && user.role === 'lehrer' ? 'lehrer' : 'schueler';
 
   // Lucide-style inline SVG icons
   const I = {
