@@ -17,13 +17,36 @@ try {
 const VOCABULARIES_KEY = 'latin-vocab-vocabularies';
 const PRACTICE_RESULTS_KEY = 'latin-vocab-practice-results';
 const THEME_KEY = 'latin-vocab-theme';
+// User-Session liegt jetzt vollständig bei Supabase Auth.
+// currentUser hält ein Profil-Objekt: { id, email, vorname, nachname, role }.
+// Wir spiegeln es nur ephemer in sessionStorage, damit Seitenwechsel nicht jedesmal
+// einen Roundtrip auslöst. Die "Wahrheit" ist immer supabase.auth.getSession().
 const USER_KEY = 'latin-vocab-user';
-// Session-Storage statt localStorage: Login geht beim Tab-Schließen verloren.
 const userStore = {
   get() { try { return JSON.parse(sessionStorage.getItem(USER_KEY) || 'null'); } catch { return null; } },
-  set(u) { sessionStorage.setItem(USER_KEY, JSON.stringify(u)); },
-  clear() { sessionStorage.removeItem(USER_KEY); localStorage.removeItem(USER_KEY); }
+  set(u) { try { sessionStorage.setItem(USER_KEY, JSON.stringify(u)); } catch {} },
+  clear() { try { sessionStorage.removeItem(USER_KEY); localStorage.removeItem(USER_KEY); } catch {} }
 };
+
+// Lädt das Profil (vorname/nachname/role) für eine eingeloggte auth-Session.
+async function loadProfile(authUser) {
+  if (!db || !authUser) return null;
+  const [{ data: u }, { data: roles }] = await Promise.all([
+    db.from('users').select('id, vorname, nachname, email').eq('id', authUser.id).maybeSingle(),
+    db.from('user_roles').select('role').eq('user_id', authUser.id),
+  ]);
+  const roleList = (roles || []).map(r => r.role);
+  // Anzeige-Rolle: lehrer > schueler (admin ist orthogonal)
+  const role = roleList.includes('lehrer') ? 'lehrer' : 'schueler';
+  return {
+    id: authUser.id,
+    email: authUser.email,
+    vorname: u?.vorname || '',
+    nachname: u?.nachname || '',
+    role,
+    roles: roleList,
+  };
+}
 
 // ============================================================
 // STATE
@@ -64,48 +87,52 @@ let studentResultId = null;
 // ============================================================
 const PAGE = (document.body && document.body.dataset.page) || 'login';
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   loadTheme();
   setupThemeToggle();
 
   if (PAGE === 'info') {
-    // info ist jetzt teil des app-shell (geschützt). Wenn nicht eingeloggt, geht's nur auf die alte Variante.
-    const u = (() => { try { return JSON.parse(sessionStorage.getItem(USER_KEY) || 'null'); } catch { return null; } })();
+    // info ist Teil des App-Shells. Profil aus Cache reicht hier.
+    const u = userStore.get();
     if (u) currentUser = u;
     return;
   }
 
   loadData();
 
-  const savedUser = (() => {
-    try { return JSON.parse(sessionStorage.getItem(USER_KEY) || 'null'); }
-    catch { userStore.clear(); return null; }
-  })();
+  if (!db) {
+    if (PAGE === 'login') { showView('login-view'); setupLoginListeners(); }
+    else window.location.href = 'index.html';
+    return;
+  }
+
+  // Auth-Status holen (Supabase verwaltet die Session selbst in localStorage)
+  const { data: sessRes } = await db.auth.getSession();
+  const authUser = sessRes?.session?.user || null;
 
   if (PAGE === 'login') {
-    if (savedUser) {
-      // Bereits eingeloggt → weiterleiten
-      window.location.href = savedUser.rolle === 'lehrer' ? 'lehrer.html' : 'schueler.html';
-      return;
+    if (authUser) {
+      const profile = await loadProfile(authUser);
+      if (profile) { currentUser = profile; userStore.set(profile); redirectToRoleHome(); return; }
     }
     showView('login-view');
     setupLoginListeners();
     return;
   }
 
-  // Geschützte Seiten (schueler/lehrer/analyse)
-  if (!savedUser) {
-    window.location.href = 'index.html';
-    return;
-  }
-  currentUser = savedUser;
+  // Geschützte Seiten
+  if (!authUser) { window.location.href = 'index.html'; return; }
+  const profile = await loadProfile(authUser);
+  if (!profile) { await db.auth.signOut(); window.location.href = 'index.html'; return; }
+  currentUser = profile;
+  userStore.set(profile);
 
   // Falsche Rolle → richtige Seite
-  if (PAGE === 'lehrer' && currentUser.rolle !== 'lehrer') {
+  if (PAGE === 'lehrer' && currentUser.role !== 'lehrer') {
     window.location.href = 'schueler.html';
     return;
   }
-  if (PAGE === 'schueler' && currentUser.rolle === 'lehrer') {
+  if (PAGE === 'schueler' && currentUser.role === 'lehrer') {
     window.location.href = 'lehrer.html';
     return;
   }
@@ -155,7 +182,7 @@ function goHome() {
 
 function redirectToRoleHome() {
   if (!currentUser) { window.location.href = 'index.html'; return; }
-  window.location.href = currentUser.rolle === 'lehrer' ? 'lehrer.html' : 'schueler.html';
+  window.location.href = currentUser.role === 'lehrer' ? 'lehrer.html' : 'schueler.html';
 }
 
 // ============================================================
@@ -204,18 +231,17 @@ function switchAuthTab(tab) {
   showError('auth-error', '');
 }
 
-// Fallback, falls RPC verify_teacher_code (noch) nicht existiert.
-const TEACHER_REGISTRATION_CODE = 'fabian2026';
-
+// Lehrer-Code wird ausschließlich serverseitig per RPC geprüft.
+// Kein Fallback im Frontend (öffentlich einsehbar wäre unsicher).
 async function isValidTeacherCode(code) {
-  if (!db) return code === TEACHER_REGISTRATION_CODE;
+  if (!db) return false;
   try {
     const { data, error } = await db.rpc('verify_teacher_code', { _code: code });
-    if (error) throw error;
+    if (error) { console.error('verify_teacher_code:', error); return false; }
     return data === true;
   } catch (e) {
-    console.warn('verify_teacher_code RPC fehlgeschlagen, nutze Fallback:', e);
-    return code === TEACHER_REGISTRATION_CODE;
+    console.error('verify_teacher_code:', e);
+    return false;
   }
 }
 
@@ -232,15 +258,21 @@ function selectRole(role) {
 
 async function login() {
   if (!db) return showError('auth-error', 'Datenbankverbindung fehlgeschlagen.');
-  const username = document.getElementById('login-username').value.trim();
-  const password = document.getElementById('login-password').value.trim();
-  if (!username || !password) return showError('auth-error', 'Bitte alle Felder ausfüllen.');
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  const password = document.getElementById('login-password').value;
+  if (!email || !password) return showError('auth-error', 'Bitte alle Felder ausfüllen.');
 
-  const { data, error } = await db.from('users').select('*').eq('benutzername', username).eq('passwort', password).single();
-  if (error || !data) return showError('auth-error', 'Ungültiger Benutzername oder Passwort.');
-
-  currentUser = data;
-  userStore.set(data);
+  const { data, error } = await db.auth.signInWithPassword({ email, password });
+  if (error || !data?.user) {
+    return showError('auth-error', 'Ungültige E-Mail oder Passwort.');
+  }
+  const profile = await loadProfile(data.user);
+  if (!profile) {
+    await db.auth.signOut();
+    return showError('auth-error', 'Profil konnte nicht geladen werden.');
+  }
+  currentUser = profile;
+  userStore.set(profile);
   showError('auth-error', '');
   redirectToRoleHome();
 }
@@ -249,10 +281,18 @@ async function register() {
   if (!db) return showError('auth-error', 'Datenbankverbindung fehlgeschlagen.');
   const vorname = document.getElementById('reg-vorname').value.trim();
   const nachname = document.getElementById('reg-nachname').value.trim();
-  const username = document.getElementById('reg-username').value.trim();
-  const password = document.getElementById('reg-password').value.trim() || '0000';
+  const email = (document.getElementById('reg-email').value || '').trim().toLowerCase();
+  const password = document.getElementById('reg-password').value;
 
-  if (!vorname || !nachname || !username) return showError('auth-error', 'Bitte alle Felder ausfüllen.');
+  if (!vorname || !nachname || !email || !password) {
+    return showError('auth-error', 'Bitte alle Felder ausfüllen.');
+  }
+  if (password.length < 6) {
+    return showError('auth-error', 'Passwort muss mindestens 6 Zeichen haben.');
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return showError('auth-error', 'Bitte gib eine gültige E-Mail an.');
+  }
 
   if (selectedRole === 'lehrer') {
     const code = document.getElementById('reg-teacher-code').value.trim();
@@ -261,22 +301,48 @@ async function register() {
     if (!ok) return showError('auth-error', 'Ungültiger Lehrer-Code.');
   }
 
-  const { data, error } = await db.from('users').insert({
-    vorname, nachname, benutzername: username, passwort: password, rolle: selectedRole
-  }).select().single();
-
+  // Supabase Auth signUp; Trigger handle_new_auth_user legt public.users + user_roles an.
+  const { data, error } = await db.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: window.location.origin,
+      data: { vorname, nachname, role: selectedRole }
+    }
+  });
   if (error) {
-    if (error.code === '23505') return showError('auth-error', 'Benutzername bereits vergeben.');
-    return showError('auth-error', 'Fehler bei der Registrierung.');
+    if ((error.message || '').toLowerCase().includes('registered')) {
+      return showError('auth-error', 'Diese E-Mail ist bereits registriert.');
+    }
+    return showError('auth-error', 'Fehler bei der Registrierung: ' + (error.message || ''));
+  }
+  if (!data?.user) {
+    return showError('auth-error', 'Registrierung fehlgeschlagen.');
   }
 
-  currentUser = data;
-  userStore.set(data);
+  // E-Mail-Bestätigung ist deaktiviert → wir haben sofort eine Session.
+  // Falls trotzdem keine Session zurückkommt, einmal explizit einloggen.
+  if (!data.session) {
+    const { error: siErr } = await db.auth.signInWithPassword({ email, password });
+    if (siErr) {
+      return showError('auth-error', 'Bitte bestätige deine E-Mail und melde dich dann an.');
+    }
+  }
+
+  const { data: sess } = await db.auth.getSession();
+  const authUser = sess?.session?.user;
+  if (!authUser) return showError('auth-error', 'Anmeldung nach Registrierung fehlgeschlagen.');
+
+  const profile = await loadProfile(authUser);
+  if (!profile) return showError('auth-error', 'Profil konnte nicht geladen werden.');
+  currentUser = profile;
+  userStore.set(profile);
   showError('auth-error', '');
   redirectToRoleHome();
 }
 
-function logout() {
+async function logout() {
+  try { if (db) await db.auth.signOut(); } catch {}
   currentUser = null;
   userStore.clear();
   window.location.href = 'index.html';
@@ -370,6 +436,7 @@ function on(id, evt, fn) {
 
 function setupLoginListeners() {
   on('login-password', 'keydown', e => { if (e.key === 'Enter') login(); });
+  on('login-email', 'keydown', e => { if (e.key === 'Enter') login(); });
 }
 
 function setupCommonAppListeners() {
@@ -735,7 +802,7 @@ function showProbeResults() {
 // TEACHER: DASHBOARD
 // ============================================================
 async function loadTeacherDashboard() {
-  if (!db || !currentUser || currentUser.rolle !== 'lehrer') return;
+  if (!db || !currentUser || currentUser.role !== 'lehrer') return;
   const { data } = await db.from('classes').select('*').eq('teacher_id', currentUser.id).order('created_at');
   const container = document.getElementById('classes-list');
   if (!data || data.length === 0) { container.innerHTML = '<p class="text-muted">Noch keine Klassen angelegt.</p>'; return; }
@@ -790,23 +857,15 @@ async function loadClassStudents() {
   }
   container.innerHTML = members.map(m => `
     <div class="student-list-item">
-      <span>${esc(m.users.vorname)} ${esc(m.users.nachname)} (${esc(m.users.benutzername)})</span>
+      <span>${esc(m.users.vorname)} ${esc(m.users.nachname)} (${esc(m.users.email)})</span>
       <div style="display:flex; gap:0.4rem;">
-        <button class="btn btn-secondary btn-small" onclick="resetStudentPassword('${m.users.id}', '${esc(m.users.vorname + ' ' + m.users.nachname)}')">Passwort zurücksetzen</button>
         <button class="btn btn-danger btn-small" onclick="removeStudent('${m.id}')">Entfernen</button>
       </div>
     </div>`).join('');
 }
 
-async function resetStudentPassword(studentId, name) {
-  const newPw = prompt(`Neues temporäres Passwort für ${name} festlegen (mind. 4 Zeichen):`, 'start1234');
-  if (!newPw) return;
-  if (newPw.length < 4) { alert('Passwort braucht mindestens 4 Zeichen.'); return; }
-  const { error } = await db.from('users').update({ passwort: newPw }).eq('id', studentId);
-  if (error) { alert('Fehler beim Zurücksetzen.'); return; }
-  alert(`Passwort für ${name} wurde auf „${newPw}" gesetzt. Bitte gib es weiter – der Schüler sollte es danach im Profil sofort selbst ändern.`);
-}
-window.resetStudentPassword = resetStudentPassword;
+// Hinweis: "Passwort zurücksetzen durch Lehrer" geht mit Supabase Auth nur noch
+// über eine Edge Function mit Service-Role-Key. Ist als Ausbau geplant.
 
 function setupStudentSearch() {
   const input = document.getElementById('student-search-input');
@@ -831,11 +890,11 @@ async function renderStudentSearch(query) {
   }
   if (!currentClassId) { dropdown.classList.add('hidden'); return; }
 
-  // Alle Schüler laden
-  const { data: students, error: studErr } = await db
-    .from('users')
-    .select('id, vorname, nachname, benutzername')
-    .eq('rolle', 'schueler');
+  // Alle Schüler laden: über user_roles → users joinen
+  const { data: studentRoleRows, error: studErr } = await db
+    .from('user_roles')
+    .select('user_id, users:users(id, vorname, nachname, email)')
+    .eq('role', 'schueler');
 
   if (studErr) {
     console.error('Schüler-Suche Fehler:', studErr);
@@ -843,6 +902,9 @@ async function renderStudentSearch(query) {
     dropdown.classList.remove('hidden');
     return;
   }
+  const students = (studentRoleRows || [])
+    .map(r => r.users)
+    .filter(Boolean);
   if (!students || students.length === 0) {
     dropdown.innerHTML = '<div class="dropdown-empty">Es sind keine Schüler registriert.</div>';
     dropdown.classList.remove('hidden');
@@ -860,7 +922,7 @@ async function renderStudentSearch(query) {
       if (!q) return true;
       return (s.vorname || '').toLowerCase().includes(q)
         || (s.nachname || '').toLowerCase().includes(q)
-        || (s.benutzername || '').toLowerCase().includes(q);
+        || (s.email || '').toLowerCase().includes(q);
     })
     .slice(0, 50);
 
@@ -870,7 +932,7 @@ async function renderStudentSearch(query) {
     dropdown.innerHTML = filtered.map(s =>
       `<div class="dropdown-item" onclick="addStudentById('${s.id}')">
          <strong>${esc(s.vorname)} ${esc(s.nachname)}</strong>
-         <span class="text-muted"> · ${esc(s.benutzername)}</span>
+         <span class="text-muted"> · ${esc(s.email)}</span>
        </div>`
     ).join('');
   }
@@ -1230,7 +1292,7 @@ function esc(str) {
 // ============================================================
 function goAnalyseHome() {
   if (!currentUser) { window.location.href = 'index.html'; return; }
-  window.location.href = currentUser.rolle === 'lehrer' ? 'lehrer.html' : 'schueler.html';
+  window.location.href = currentUser.role === 'lehrer' ? 'lehrer.html' : 'schueler.html';
 }
 
 function setupAnalyseListeners() {
@@ -1238,7 +1300,7 @@ function setupAnalyseListeners() {
   // Bücher im Hintergrund laden, damit Suche funktioniert
   loadAllBooksForAnalysis();
   // Lehrer sehen Tabs (Suche + Formen-Check). Schüler nur Suche.
-  if (currentUser && currentUser.rolle === 'lehrer') {
+  if (currentUser && currentUser.role === 'lehrer') {
     const t = document.getElementById('analyse-tabs');
     if (t) t.classList.remove('hidden');
   }
@@ -1296,7 +1358,7 @@ function runAnalyse() {
   const query = input.value.trim();
   if (!query) { out.innerHTML = '<p class="analyse-empty">Bitte eine Eingabe machen.</p>'; return; }
 
-  const isTeacher = currentUser && currentUser.rolle === 'lehrer';
+  const isTeacher = currentUser && currentUser.role === 'lehrer';
   const vocabPool = ALL_VOCABS_FOR_ANALYSIS.length ? ALL_VOCABS_FOR_ANALYSIS : vocabularies;
 
   if (ANALYSE_MODE === 'forms' && isTeacher) {
@@ -1415,7 +1477,7 @@ startPractice = function () {
 // ============================================================
 const _origLoadTeacherDashboard = loadTeacherDashboard;
 loadTeacherDashboard = async function () {
-  if (!db || !currentUser || currentUser.rolle !== 'lehrer') return;
+  if (!db || !currentUser || currentUser.role !== 'lehrer') return;
   const { data: classes } = await db.from('classes').select('*').eq('teacher_id', currentUser.id).order('created_at');
   const container = document.getElementById('classes-list');
   if (!classes || classes.length === 0) {
@@ -1464,7 +1526,7 @@ function initProfilePage() {
   const nm = document.getElementById('profil-name');
   if (nm) nm.textContent = `${currentUser.vorname} ${currentUser.nachname}`;
   const meta = document.getElementById('profil-meta');
-  if (meta) meta.textContent = `${currentUser.benutzername} · ${currentUser.rolle === 'lehrer' ? 'Lehrer' : 'Schüler'}`;
+  if (meta) meta.textContent = `${currentUser.email} · ${currentUser.role === 'lehrer' ? 'Lehrer' : 'Schüler'}`;
   // Felder vorbelegen
   const v = document.getElementById('prof-vorname');
   const n = document.getElementById('prof-nachname');
@@ -1477,7 +1539,7 @@ async function loadProfileClasses() {
   const el = document.getElementById('profil-classes-list');
   if (!el || !db || !currentUser) return;
   let classes = [];
-  if (currentUser.rolle === 'lehrer') {
+  if (currentUser.role === 'lehrer') {
     const { data } = await db.from('classes').select('id,name').eq('teacher_id', currentUser.id).order('created_at');
     classes = data || [];
   } else {
@@ -1499,7 +1561,7 @@ async function loadProfileClasses() {
   });
 
   let myResults = new Map();
-  if (currentUser.rolle !== 'lehrer' && tests && tests.length > 0) {
+  if (currentUser.role !== 'lehrer' && tests && tests.length > 0) {
     const testIds = tests.map(t => t.id);
     const { data: results } = await db.from('results').select('test_id,score,total,created_at').eq('student_id', currentUser.id).in('test_id', testIds);
     (results || []).forEach(r => myResults.set(r.test_id, r));
@@ -1515,7 +1577,7 @@ async function loadProfileClasses() {
         const r = myResults.get(t.id);
         const status = r
           ? `<span class="badge badge-success">${r.score}/${r.total}</span>`
-          : (currentUser.rolle === 'lehrer'
+          : (currentUser.role === 'lehrer'
               ? `<span class="text-muted" style="font-size:0.8rem;">${t.question_count} Fragen</span>`
               : `<span class="badge">noch nicht geschrieben</span>`);
         return `<li><span>${esc(t.name)}</span> ${status}</li>`;
@@ -1546,20 +1608,17 @@ async function saveName() {
 }
 
 async function changePassword() {
-  const oldPw = document.getElementById('pw-old').value;
   const newPw = document.getElementById('pw-new').value;
   const newPw2 = document.getElementById('pw-new2').value;
   const msg = document.getElementById('pw-msg');
   msg.textContent = ''; msg.className = 'success-msg';
-  if (!oldPw || !newPw || !newPw2) { msg.className = 'error-msg'; msg.textContent = 'Bitte alle Felder ausfüllen.'; return; }
+  if (!newPw || !newPw2) { msg.className = 'error-msg'; msg.textContent = 'Bitte alle Felder ausfüllen.'; return; }
   if (newPw !== newPw2) { msg.className = 'error-msg'; msg.textContent = 'Die neuen Passwörter stimmen nicht überein.'; return; }
-  if (newPw.length < 4) { msg.className = 'error-msg'; msg.textContent = 'Neues Passwort braucht mindestens 4 Zeichen.'; return; }
-  if (oldPw !== currentUser.passwort) { msg.className = 'error-msg'; msg.textContent = 'Aktuelles Passwort ist falsch.'; return; }
-  const { error } = await db.from('users').update({ passwort: newPw }).eq('id', currentUser.id);
-  if (error) { msg.className = 'error-msg'; msg.textContent = 'Fehler beim Ändern.'; return; }
-  currentUser.passwort = newPw;
-  userStore.set(currentUser);
-  document.getElementById('pw-old').value = '';
+  if (newPw.length < 6) { msg.className = 'error-msg'; msg.textContent = 'Neues Passwort braucht mindestens 6 Zeichen.'; return; }
+  if (!db) { msg.className = 'error-msg'; msg.textContent = 'Keine Datenbankverbindung.'; return; }
+  // Supabase Auth: aktuelles Passwort ist nicht nötig, weil die Session bereits authentifiziert ist.
+  const { error } = await db.auth.updateUser({ password: newPw });
+  if (error) { msg.className = 'error-msg'; msg.textContent = 'Fehler beim Ändern: ' + error.message; return; }
   document.getElementById('pw-new').value = '';
   document.getElementById('pw-new2').value = '';
   msg.textContent = 'Passwort geändert.';
@@ -1569,11 +1628,15 @@ async function deleteAccount() {
   if (!confirm('Account wirklich endgültig löschen? Das kann nicht rückgängig gemacht werden.')) return;
   if (!confirm('Letzte Warnung: alle deine Daten werden gelöscht. Fortfahren?')) return;
   if (!db) return alert('Keine Datenbankverbindung.');
+  // Mit Supabase Auth kann ein User sich nicht selbst aus auth.users löschen
+  // (das geht nur mit Service-Role oder einer Edge Function).
+  // Wir löschen daher die public.users-Zeile (kaskadiert auf classes/results/...)
+  // und melden uns ab. Eine optionale Edge Function "delete_self" als Ausbau geplant.
   const { error } = await db.from('users').delete().eq('id', currentUser.id);
   if (error) return alert('Fehler beim Löschen: ' + error.message);
+  await db.auth.signOut();
   userStore.clear();
-  sessionStorage.clear();
-  alert('Dein Account wurde gelöscht.');
+  alert('Deine Daten wurden gelöscht. Der Auth-Account wird automatisch entfernt.');
   window.location.href = 'index.html';
 }
 
